@@ -1,6 +1,6 @@
 import http from 'http';
 import pkg from 'octokit';
-import pkg from 'octokit';
+import elastic from '@elastic/elasticsearch';
 
 const { Octokit, App, Action } = pkg;
 
@@ -14,7 +14,7 @@ const server = http.createServer((request, response) => {
 })
 
 const octokit = new Octokit({
-    auth: `xxxxxxxxxxxx`,
+    auth: `xxxx`,
     userAgent: 'JStats v0.1',
     timeZone: 'Asia/Bangkok',
     log: {
@@ -24,25 +24,44 @@ const octokit = new Octokit({
         error: console.error
     },
 });
-
+// paginate
 await octokit.rest.users.getAuthenticated()
     .then(({ data }) => {
     console.info(`Hello`, data.login)
 });
 
-const repos = await octokit.rest.repos.listForOrg({org:'centraldigital',type:'private'})
-    .then(({ data }) => {
+const { Client } = elastic;
+const ElasticClient = new Client({ node: 'http://192.168.99.101:9200' })
+
+const repos = await octokit.paginate(
+        octokit.rest.repos.listForOrg,
+        {org:'centraldigital',type:'private', per_page:200}
+    ).then(({ data }) => {
         return data
 });
 
-repos.forEach((item) => {
-    // console.log(item.name)
-})
+for (const repository of repos) {
+    await ElasticClient.index({
+        index: 'jstats-repository',
+        body: repository
+    })
 
-const pullRequests = await octokit.rest.pulls.list({owner:'centraldigital', repo:'centech-api'})
-    .then(({ data }) => {
-        // console.log(data)
-});
+    const pullRequests = await octokit.paginate(
+            octokit.rest.pulls.list,
+            {owner:'centraldigital', repo:repository.name}
+        ).then(({ data }) => {
+            return data
+        });
+
+    for (const pullrequest of pullRequests) {
+        await ElasticClient.index({
+            index: 'jstats-pullrequest',
+            body: pullrequest
+        })
+    }
+}
+
+
 
 const pullRequestReviews = await octokit.rest.pulls.listReviews({
     owner:'centraldigital',
@@ -53,25 +72,25 @@ const pullRequestReviews = await octokit.rest.pulls.listReviews({
         // console.log(data)
 });
 
-const { Client } = pkg;
-const ElasticClient = new Client({ node: 'http://localhost:9200' })
 
-ElasticClient.indices.putMapping({
-    index: '',
-    type: "document",
-    body: {
-        properties: {
-            title: { type: "string" },
-            content: { type: "string" },
-            suggest: {
-                type: "completion",
-                analyzer: "simple",
-                search_analyzer: "simple",
-                payloads: true
-            }
-        }
-    }
-})
+
+
+// ElasticClient.indices.putMapping({
+//     index: '',
+//     type: "document",
+//     body: {
+//         properties: {
+//             title: { type: "string" },
+//             content: { type: "string" },
+//             suggest: {
+//                 type: "completion",
+//                 analyzer: "simple",
+//                 search_analyzer: "simple",
+//                 payloads: true
+//             }
+//         }
+//     }
+// })
 
 server.listen(port, hostname, () => {
     console.log(`Server running at http://${hostname}:${port}/`);
