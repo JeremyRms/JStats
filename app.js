@@ -14,7 +14,7 @@ const server = http.createServer((request, response) => {
 })
 
 const octokit = new Octokit({
-    auth: `xxxx`,
+    auth: `xxx`,
     userAgent: 'JStats v0.1',
     timeZone: 'Asia/Bangkok',
     log: {
@@ -24,7 +24,7 @@ const octokit = new Octokit({
         error: console.error
     },
 });
-// paginate
+
 await octokit.rest.users.getAuthenticated()
     .then(({ data }) => {
     console.info(`Hello`, data.login)
@@ -35,42 +35,42 @@ const ElasticClient = new Client({ node: 'http://192.168.99.101:9200' })
 
 const repos = await octokit.paginate(
         octokit.rest.repos.listForOrg,
-        {org:'centraldigital',type:'private', per_page:200}
-    ).then(({ data }) => {
-        return data
-});
+        {org:'centraldigital',type:'private',per_page: 100},
+        response => response.data
+    )
+
+// throw repos[0]
 
 for (const repository of repos) {
     await ElasticClient.index({
+        id: repository.id,
         index: 'jstats-repository',
         body: repository
     })
 
     const pullRequests = await octokit.paginate(
-            octokit.rest.pulls.list,
-            {owner:'centraldigital', repo:repository.name}
-        ).then(({ data }) => {
-            return data
-        });
+        octokit.rest.pulls.list,
+        {owner:'centraldigital', repo:repository.name,per_page: 100},
+        response => response.data
+    )
 
     for (const pullrequest of pullRequests) {
         await ElasticClient.index({
+            id: pullrequest.id,
             index: 'jstats-pullrequest',
             body: pullrequest
         })
     }
 }
 
-
-
-const pullRequestReviews = await octokit.rest.pulls.listReviews({
-    owner:'centraldigital',
-    repo:'central-category-api',
-    pull_number:'1',
-})
-    .then(({ data }) => {
-        // console.log(data)
-});
+// const pullRequestReviews = await octokit.rest.pulls.listReviews({
+//     owner:'centraldigital',
+//     repo:'central-category-api',
+//     pull_number:'1',
+// })
+//     .then(({ data }) => {
+//         // console.log(data)
+// });
 
 
 
