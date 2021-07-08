@@ -32,13 +32,17 @@ await octokit.rest.users.getAuthenticated()
 const { Client } = elastic;
 const ElasticClient = new Client({ node: 'http://192.168.99.101:9200' })
 
+let repoCount = 0
+let pullCount = 0
+let reviewCount = 0
 const repos = await octokit.paginate(
         octokit.rest.repos.listForOrg,
-        {org:'centraldigital',type:'private',per_page: 100},
+        {org:'centraldigital',type:'private',per_page: 100,state:'all'},
         response => response.data
     )
 
-// throw repos[0]
+repoCount = repos.length
+console.info(repoCount, `repos found`)
 
 for (const repository of repos) {
     await ElasticClient.index({
@@ -53,44 +57,45 @@ for (const repository of repos) {
         response => response.data
     )
 
+    if (pullRequests.length) {
+        pullCount += pullRequests.length
+        console.info(pullCount, `pulls tally`)
+    }
+
     for (const pullrequest of pullRequests) {
         await ElasticClient.index({
             id: pullrequest.id,
             index: 'jstats-pullrequest',
             body: pullrequest
         })
+
+        const reviews = await octokit.paginate(
+            octokit.rest.pulls.listReviews,
+            {owner:'centraldigital', repo:repository.name,pull_number:pullrequest.number,per_page: 100},
+            response => response.data
+        )
+        if (reviews.length) {
+            reviewCount += reviews.length
+            console.info(reviewCount, `reviews tally`)
+        }
+
+        for (const review of reviews) {
+            await ElasticClient.index({
+                id: review.id,
+                index: 'jstats-review',
+                body: review
+            })
+        }
     }
 }
 
-// const pullRequestReviews = await octokit.rest.pulls.listReviews({
-//     owner:'centraldigital',
-//     repo:'central-category-api',
-//     pull_number:'1',
-// })
-//     .then(({ data }) => {
-//         // console.log(data)
-// });
+console.info(pullCount, `pulls found`)
+console.info(reviewCount, `reviews found`)
 
+let port = process.env.PORT;
+let hostname = process.env.HOSTNAME
 
-
-
-// ElasticClient.indices.putMapping({
-//     index: '',
-//     type: "document",
-//     body: {
-//         properties: {
-//             title: { type: "string" },
-//             content: { type: "string" },
-//             suggest: {
-//                 type: "completion",
-//                 analyzer: "simple",
-//                 search_analyzer: "simple",
-//                 payloads: true
-//             }
-//         }
-//     }
-// })
 
 server.listen(port, hostname, () => {
-    console.log(`Server running at http://${process.env.HOSTNAME}:${process.env.PORT}/`);
+    console.log(`Server running at http://${hostname}:${port}/`);
 });
