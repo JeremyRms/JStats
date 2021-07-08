@@ -1,11 +1,10 @@
 import http from 'http';
 import pkg from 'octokit';
 import elastic from '@elastic/elasticsearch';
-
+import dotenv from 'dotenv';
 const { Octokit, App, Action } = pkg;
 
-const hostname = '127.0.0.1';
-const port = 3000;
+dotenv.config();
 
 const server = http.createServer((request, response) => {
     response.statusCode = 200;
@@ -14,7 +13,7 @@ const server = http.createServer((request, response) => {
 })
 
 const octokit = new Octokit({
-    auth: `xxx`,
+    auth: `${process.env.API_KEY}`,
     userAgent: 'JStats v0.1',
     timeZone: 'Asia/Bangkok',
     log: {
@@ -93,5 +92,5 @@ for (const repository of repos) {
 // })
 
 server.listen(port, hostname, () => {
-    console.log(`Server running at http://${hostname}:${port}/`);
+    console.log(`Server running at http://${process.env.HOSTNAME}:${process.env.PORT}/`);
 });
