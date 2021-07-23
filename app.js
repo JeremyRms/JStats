@@ -15,7 +15,7 @@ const server = http.createServer((request, response) => {
 const octokit = new Octokit({
     auth: `${process.env.API_KEY}`,
     userAgent: 'JStats v0.1',
-    timeZone: 'Asia/Bangkok',
+    timeZone: `${process.env.TIMEZONE}`,
     log: {
         debug: () => {},
         info: () => {},
@@ -30,11 +30,18 @@ await octokit.rest.users.getAuthenticated()
 });
 
 const { Client } = elastic;
-const ElasticClient = new Client({ node: 'http://192.168.99.101:9200' })
+const ElasticClient = new Client({ node: `${process.env.ELASTIC_ENDPOINT}:${process.env.ELASTIC_PORT}` })
 
-let repoCount = 0
+// cleaning up before to start
+// ElasticClient.indices.delete({
+//     index: '*'
+// })
+
+let repoCount
 let pullCount = 0
 let reviewCount = 0
+let commentCount = 0
+
 const repos = await octokit.paginate(
         octokit.rest.repos.listForOrg,
         {org:'centraldigital',type:'private',per_page: 100,state:'all'},
@@ -53,7 +60,7 @@ for (const repository of repos) {
 
     const pullRequests = await octokit.paginate(
         octokit.rest.pulls.list,
-        {owner:'centraldigital', repo:repository.name,per_page: 100},
+        {owner:'centraldigital', repo:repository.name,state:'all',per_page: 100},
         response => response.data
     )
 
@@ -62,18 +69,20 @@ for (const repository of repos) {
         console.info(pullCount, `pulls tally`)
     }
 
-    for (const pullrequest of pullRequests) {
+    for (const pullRequest of pullRequests) {
         await ElasticClient.index({
-            id: pullrequest.id,
+            id: pullRequest.id,
             index: 'jstats-pullrequest',
-            body: pullrequest
+            body: pullRequest
         })
 
+        // Reviews
         const reviews = await octokit.paginate(
             octokit.rest.pulls.listReviews,
-            {owner:'centraldigital', repo:repository.name,pull_number:pullrequest.number,per_page: 100},
+            {owner:'centraldigital', repo:repository.name,pull_number:pullRequest.number,per_page: 100},
             response => response.data
         )
+
         if (reviews.length) {
             reviewCount += reviews.length
             console.info(reviewCount, `reviews tally`)
@@ -84,6 +93,26 @@ for (const repository of repos) {
                 id: review.id,
                 index: 'jstats-review',
                 body: review
+            })
+        }
+
+        // Comments
+        const comments = await octokit.paginate(
+            octokit.rest.pulls.listReviewComments,
+            {owner:'centraldigital', repo:repository.name,pull_number:pullRequest.number,per_page: 100},
+            response => response.data
+        )
+
+        if (comments.length) {
+            commentCount += comments.length
+            console.info(commentCount, `comments tally`)
+        }
+
+        for (const comment of comments) {
+            await ElasticClient.index({
+                id: comment.id,
+                index: 'jstats-comment',
+                body: comment
             })
         }
     }
