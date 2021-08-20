@@ -12,10 +12,13 @@ docker-compose -f elastic-docker-tls.yml up -d
 docker exec es01 /bin/bash -c "bin/elasticsearch-setup-passwords auto --batch --url https://es01:9200"  > ~/.elk/elastic-stack 
 
 # finds and replace the kibana user password in the TLS file
-kibanaPassword=`sed -rn 's/PASSWORD kibana_system = ([a-zA-Z0-9]*)[:space:]/\1/p' ~/.elk/elastic-stack`
+kibanaPassword=`sed -rn 's/PASSWORD elastic = ([a-zA-Z0-9]*)[:space:]/\1/p' ~/.elk/elastic-stack`
 echo $kibanaPassword
 sed -i "" "s/CHANGEME/$kibanaPassword/g" elastic-docker-tls.yml
 
 # restarting...
 docker-compose stop
 docker-compose -f elastic-docker-tls.yml up -d
+
+# creates certificates
+docker-compose -f run-app.yml run --rm jstats 
