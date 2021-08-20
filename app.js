@@ -44,7 +44,7 @@ let commentCount = 0
 
 const repos = await octokit.paginate(
         octokit.rest.repos.listForOrg,
-        {org:'centraldigital',type:'private',per_page: 100,state:'all'},
+        {org:`${process.env.ORGANIZATION}`,type:'private',per_page: 100,state:'all'},
         response => response.data
     )
 
@@ -60,7 +60,7 @@ for (const repository of repos) {
 
     const pullRequests = await octokit.paginate(
         octokit.rest.pulls.list,
-        {owner:'centraldigital', repo:repository.name,state:'all',per_page: 100},
+        {owner:`${process.env.ORGANIZATION}`, repo:repository.name,state:'all',per_page: 100},
         response => response.data
     )
 
@@ -79,7 +79,7 @@ for (const repository of repos) {
         // Reviews
         const reviews = await octokit.paginate(
             octokit.rest.pulls.listReviews,
-            {owner:'centraldigital', repo:repository.name,pull_number:pullRequest.number,per_page: 100},
+            {owner:`${process.env.ORGANIZATION}`, repo:repository.name,pull_number:pullRequest.number,per_page: 100},
             response => response.data
         )
 
@@ -99,7 +99,7 @@ for (const repository of repos) {
         // Comments
         const comments = await octokit.paginate(
             octokit.rest.pulls.listReviewComments,
-            {owner:'centraldigital', repo:repository.name,pull_number:pullRequest.number,per_page: 100},
+            {owner:`${process.env.ORGANIZATION}`, repo:repository.name,pull_number:pullRequest.number,per_page: 100},
             response => response.data
         )
 
