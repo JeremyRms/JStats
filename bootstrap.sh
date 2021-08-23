@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Tear down previous installation..."
+echo Tear down previous installation...
 docker-compose down -v --remove-orphans --timeout 10
 
 if [ ! -f ".env" ]; then
@@ -21,37 +21,39 @@ if [ ! -f ".env" ]; then
         echo 'TIMEZONE = Asia/Bangkok'
         echo 'ORGANIZATION = GITHUBORGANIZATION'
         echo 'ELASTIC_PASSWORD = ELASTICUSERPASSWORD'
-} > .env
+    } > .env
 
-echo GitHub API Key?
-read -sp 'API KEY: ' API_KEY
+    echo -e GitHub API Key?
+    read -sp 'API KEY: ' API_KEY
 
-sed -i "" "s/GITHUBAPIKEY/$API_KEY/g" .env
+    sed -i "" "s/GITHUBAPIKEY/$API_KEY/g" .env
 
-echo \nGitHub Organization name?
-read ORGANIZATION
+    echo -e GitHub Organization name?
+    read ORGANIZATION
 
-sed -i "" "s/GITHUBORGANIZATION/$ORGANIZATION/g" .env
+    sed -i "" "s/GITHUBORGANIZATION/$ORGANIZATION/g" .env
 fi
 
-echo "Creating certificates..."
+echo Creating certificates...
 docker-compose -f create-certs.yml run --rm create_certs
 
-echo "Creating and staring containers..."
+echo Creating and staring containers...
 docker-compose -f elastic-docker-tls.yml up -d         
 
 mkdir ~/.elk
 
-echo "Generating ELK passwords..."
+echo Generating ELK passwords...
 docker exec es01 /bin/bash -c "bin/elasticsearch-setup-passwords auto --batch --url https://es01:9200"  > ~/.elk/elastic-stack 
 
-echo "Finds and replace the kibana user password in the .env file..."
+echo Finds and replace the kibana user password in the .env file...
 elasticPassword=`sed -rn 's/PASSWORD elastic = ([a-zA-Z0-9]*)/\1/p' ~/.elk/elastic-stack`
 sed -i "" "s/ELASTICUSERPASSWORD/$elasticPassword/g" .env
 
-echo "Restarting containers..."
+echo Restarting containers...
 docker-compose stop
 docker-compose -f elastic-docker-tls.yml up -d
 
-echo "Running the application..."
+echo Importing dashboards...
+
+echo Running the application...
 docker-compose -f jstats.yml run --rm jstats 
