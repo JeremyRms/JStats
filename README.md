@@ -31,4 +31,5 @@ Create servers, volumes and network with the following command:
 
 ## TODO:
 
-[ ] Add a container for the NodeJs application.
+[x] Add a container for the NodeJs application.
+[ ] import kibana dashboard
