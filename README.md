@@ -29,8 +29,6 @@ ELASTIC_PASSWORD = 'CHANGEME'
 Create servers, volumes and network with the following command:
 `docker-compose -f elastic-docker-tls.yml up -d`
 
-Simply run `node app.js` with node v16 or higher to populate your ElasticSearch index with GitHub data.
-
 ## TODO:
 
 [ ] Add a container for the NodeJs application.

@@ -1,0 +1,26 @@
+version: '2.2'
+
+services:
+  jstats:
+    image: node
+    container_name: jstats
+    command: >
+      bash -c '
+        cd /app
+        npm install
+        node app.js
+      '
+    working_dir: /usr/share/elasticsearch
+    volumes: 
+      - certs:/certs
+      - '.:/app'
+    networks:
+      - elastic
+
+volumes: 
+  certs:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge
