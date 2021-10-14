@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo Tear down previous installation...
-docker-compose down -v --remove-orphans --timeout 10
+docker-compose -f elastic-docker-tls.yml down -v --remove-orphans --timeout 10
 
 if [ ! -f ".env" ]; then
     echo "Adding .env file."
@@ -40,6 +40,7 @@ docker-compose -f create-certs.yml run --rm create_certs
 echo Creating and staring containers...
 docker-compose -f elastic-docker-tls.yml up -d         
 
+rmdir ~/.elk
 mkdir ~/.elk
 
 echo Generating ELK passwords...
@@ -50,10 +51,11 @@ elasticPassword=`sed -rn 's/PASSWORD elastic = ([a-zA-Z0-9]*)/\1/p' ~/.elk/elast
 sed -i "" "s/ELASTICUSERPASSWORD/$elasticPassword/g" .env
 
 echo Restarting containers...
-docker-compose stop
+docker-compose -f elastic-docker-tls.yml stop
 docker-compose -f elastic-docker-tls.yml up -d
 
 echo Importing dashboards...
+#curl -u elastic:5zgI7Vl5dtXq4cCFPdKf -k -X POST "https://localhost:5601/kibana/dashboards/import -H --form file=export.ndjson" -H 'kbn-xsrf: true' 
 
 echo Running the application...
 docker-compose -f jstats.yml run --rm jstats 
