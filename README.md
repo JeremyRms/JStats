@@ -9,6 +9,8 @@ Just launch:
 
 Please make sure it's executable.
 
+Connect to https://localhost:5601/ and use kibana user and password
+
 ## TODO
 
 [x] Add a container for the NodeJs application.
