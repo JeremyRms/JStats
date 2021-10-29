@@ -40,7 +40,7 @@ docker-compose -f create-certs.yml run --rm create_certs
 echo Creating and staring containers...
 docker-compose -f elastic-docker-tls.yml up -d         
 
-rmdir ~/.elk
+rm -rf ~/.elk
 mkdir ~/.elk
 
 echo Generating ELK passwords...
