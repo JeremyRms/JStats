@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo Tear down previous installation...
-docker-compose -f elastic-docker-tls.yml down -v --remove-orphans --timeout 10
+docker-compose -f elastic-docker-tls.yml down -v --timeout 10
 
 if [ ! -f ".env" ]; then
     echo "Adding .env file."
@@ -37,7 +37,7 @@ fi
 echo Creating certificates...
 docker-compose -f create-certs.yml run --rm create_certs
 
-echo Creating and staring containers...
+echo Creating and starting containers...
 docker-compose -f elastic-docker-tls.yml up -d         
 
 rm -rf ~/.elk
@@ -58,4 +58,4 @@ echo Importing dashboards...
 #curl -u elastic:5zgI7Vl5dtXq4cCFPdKf -k -X POST "https://localhost:5601/kibana/dashboards/import -H --form file=export.ndjson" -H 'kbn-xsrf: true' 
 
 echo Running the application...
-docker-compose -f jstats.yml run --rm jstats 
+docker-compose -f jstats.yml run -d --rm jstats --name jstats

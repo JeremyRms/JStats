@@ -1,9 +1,11 @@
 import http from "http";
 import pkg from "octokit";
 import elastic from "@elastic/elasticsearch";
+import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
 import * as fs from 'fs';
 const { Octokit, App, Action } = pkg;
+const { throttling } = pkgthrottling;
 
 dotenv.config();
 
@@ -13,7 +15,9 @@ const server = http.createServer((request, response) => {
   response.end();
 });
 
-const octokit = new Octokit({
+const JStatsOctokit = Octokit.plugin(throttling);
+
+const octokit = new JStatsOctokit({
   auth: `${process.env.API_KEY}`,
   userAgent: "JStats v0.1",
   timeZone: `${process.env.TIMEZONE}`,

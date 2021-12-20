@@ -180,10 +180,10 @@
     "@octokit/types" "^6.0.3"
     "bottleneck" "^2.15.3"
 
-"@octokit/plugin-throttling@^3.4.3":
-  "integrity" "sha512-xwUQYG2FFVGC/jf+YE4vCh2Nzi4kBRthuDlmYSwz6G8RXurl8i3KNxygKFaXIowgjghxZswxT9fNgIyROuHAWg=="
-  "resolved" "https://registry.npmjs.org/@octokit/plugin-throttling/-/plugin-throttling-3.5.0.tgz"
-  "version" "3.5.0"
+"@octokit/plugin-throttling@^3.4.3", "@octokit/plugin-throttling@^3.5.2":
+  "integrity" "sha512-Eu7kfJxU8vmHqWGNszWpg+GVp2tnAfax3XQV5CkYPEE69C+KvInJXW9WajgSeW+cxYe0UVdouzCtcreGNuJo7A=="
+  "resolved" "https://registry.npmjs.org/@octokit/plugin-throttling/-/plugin-throttling-3.5.2.tgz"
+  "version" "3.5.2"
   dependencies:
     "@octokit/types" "^6.0.1"
     "bottleneck" "^2.15.3"
