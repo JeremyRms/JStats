@@ -19,7 +19,7 @@ const JStatsOctokit = Octokit.plugin(throttling);
 
 const octokit = new JStatsOctokit({
   auth: `${process.env.API_KEY}`,
-  userAgent: "JStats v0.1",
+  userAgent: "JStats v0.2",
   timeZone: `${process.env.TIMEZONE}`,
   log: {
     debug: () => {},
@@ -74,6 +74,28 @@ let repoCount;
 let pullCount = 0;
 let reviewCount = 0;
 let commentCount = 0;
+let membersCount = 0;
+let teamsCount = 0;
+
+const members = await octokit.paginate(
+  octokit.rest.orgs.listMembers,
+  {
+    org: `${process.env.ORGANIZATION}`,
+  },
+  (response) => response.data
+);
+membersCount = members.length;
+console.info(membersCount, ` members found`);
+
+for (const member of members) {
+  cleanMember(member);
+
+  await ElasticClient.index({
+    id: member.id,
+    index: "jstats-member",
+    body: member,
+  });
+}
 
 const repos = await octokit.paginate(
   octokit.rest.repos.listForOrg,
@@ -92,6 +114,8 @@ repoCount = repos.length;
 console.info(repoCount, `repos found`);
 
 for (const repository of repos) {
+  console.info(`pulling data for repository:`, repository.name);
+
   cleanRepo(repository);
 
   await ElasticClient.index({
@@ -100,7 +124,27 @@ for (const repository of repos) {
     body: repository,
   });
 
-  console.info(`pulling data for repository:`, repository.name);
+  const teams = await octokit.paginate(
+    octokit.rest.repos.listTeams,
+    {
+      owner: `${process.env.ORGANIZATION}`,
+      repo: repository.name,
+    },
+    (response) => response.data
+  );
+
+  teamsCount = teams.length;
+  console.info(teamsCount, ` teams found for repo `, repository.name);
+
+  for (const team of teams) {
+    cleanTeam(team);
+
+    await ElasticClient.index({
+      id: team.id,
+      index: "jstats-teams",
+      body: team,
+    });
+  }
 
   const pullRequests = await octokit.paginate(
     octokit.rest.pulls.list,
@@ -119,6 +163,15 @@ for (const repository of repos) {
   }
 
   for (const pullRequest of pullRequests) {
+    reviewCount = 0;
+
+    const prDiff = await octokit.rest.pulls.get({
+      owner: `${process.env.ORGANIZATION}`,
+      repo: repository.name,
+      pull_number: pullRequest.number,
+    });
+    pullRequest['diff'] = prDiff?.['data'];
+    
     cleanPR(pullRequest);
 
     await ElasticClient.index({
@@ -141,7 +194,7 @@ for (const repository of repos) {
 
     if (reviews.length) {
       reviewCount += reviews.length;
-      console.info(reviewCount, `reviews tally`);
+      console.info(reviewCount, `reviews found for repo `, repository.name);
     }
 
     for (const review of reviews) {
@@ -168,7 +221,7 @@ for (const repository of repos) {
 
     if (comments.length) {
       commentCount += comments.length;
-      console.info(commentCount, `comments tally`);
+      console.info(commentCount, `comments found for PR `, pullRequest.id);
     }
 
     for (const comment of comments) {
@@ -308,6 +361,12 @@ function cleanPR(pullRequest) {
   delete pullRequest?.["assignee"]?.["node_id"];
   delete pullRequest?.["assignee"]?.["type"];
 
+  delete pullRequest["diff"]?.["_links"];
+  delete pullRequest["diff"]?.["active_lock_reason"];
+  delete pullRequest["diff"]?.["diff_url"];
+  delete pullRequest["diff"]?.["merge_commit_sha"];
+  delete pullRequest["diff"]?.["node_id"];
+
   for (const key in pullRequest) {
     if (key.search(/_url/) != -1) {
       delete pullRequest[key];
@@ -353,6 +412,41 @@ function cleanPR(pullRequest) {
   for (const key in pullRequest?.["head"]?.["repo"]) {
     if (key.search(/_url/) != -1) {
       delete pullRequest?.["head"]?.["repo"][key];
+    }
+  }
+
+  for (const key in pullRequest){
+    delete pullRequest["diff"]?.[key];
+  }
+  for (const key in pullRequest["diff"]) {
+    if (key.search(/_url/) != -1) {
+      delete pullRequest["diff"][key];
+    }
+  }
+  for (const key in pullRequest["diff"]?.["merged_by"]) {
+    if (key.search(/_url/) != -1) {
+      delete pullRequest["diff"]["merged_by"][key];
+    }
+  }
+}
+
+
+function cleanMember(member) {
+  delete member?.["node_id"];
+
+  for (const key in member) {
+    if (key.search(/_url/) != -1) {
+      delete member[key];
+    }
+  }
+}
+
+function cleanTeam(team) {
+  delete team?.["node_id"];
+
+  for (const key in team) {
+    if (key.search(/_url/) != -1) {
+      delete team[key];
     }
   }
 }
