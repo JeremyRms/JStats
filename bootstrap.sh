@@ -55,7 +55,7 @@ docker-compose -f elastic-docker-tls.yml stop
 docker-compose -f elastic-docker-tls.yml up -d
 
 echo Importing dashboards...
-#curl -u elastic:5zgI7Vl5dtXq4cCFPdKf -k -X POST "https://localhost:5601/kibana/dashboards/import -H --form file=export.ndjson" -H 'kbn-xsrf: true' 
+# KIBANA_PASSWORD="$elasticPassword" ./scripts/kibana-saved-objects.sh import dashboards/teamwork.ndjson
 
 echo Running the application...
 docker-compose -f jstats.yml run -d --rm jstats --name jstats
