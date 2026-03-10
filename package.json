@@ -4,6 +4,9 @@
   "main": "app.js",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "@elastic/elasticsearch": "^7.13.0",
     "@octokit/plugin-throttling": "^3.5.2",

@@ -4,6 +4,7 @@ import elastic from "@elastic/elasticsearch";
 import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
 import * as fs from "fs";
+import { enrichDocument } from "./src/document-enrichment.js";
 const { Octokit, App, Action } = pkg;
 const { throttling } = pkgthrottling;
 
@@ -88,6 +89,10 @@ membersCount = members.length;
 console.info(membersCount, ` members found`);
 
 for (const member of members) {
+  enrichDocument(member, {
+    organization: `${process.env.ORGANIZATION}`,
+    entityType: "member",
+  });
   cleanMember(member);
 
   await ElasticClient.index({
@@ -116,6 +121,11 @@ console.info(repoCount, `repos found`);
 for (const repository of repos) {
   console.info(`pulling data for repository:`, repository.name);
 
+  enrichDocument(repository, {
+    organization: `${process.env.ORGANIZATION}`,
+    repository: repository.name,
+    entityType: "repository",
+  });
   cleanRepo(repository);
 
   await ElasticClient.index({
@@ -137,6 +147,11 @@ for (const repository of repos) {
   console.info(teamsCount, ` teams found for repo `, repository.name);
 
   for (const team of teams) {
+    enrichDocument(team, {
+      organization: `${process.env.ORGANIZATION}`,
+      repository: repository.name,
+      entityType: "team",
+    });
     cleanTeam(team);
 
     await ElasticClient.index({
@@ -163,14 +178,20 @@ for (const repository of repos) {
   }
 
   for (const pullRequest of pullRequests) {
-    reviewCount = 0;
-
     const prDiff = await octokit.rest.pulls.get({
       owner: `${process.env.ORGANIZATION}`,
       repo: repository.name,
       pull_number: pullRequest.number,
     });
     pullRequest['diff'] = prDiff?.['data'];
+
+    enrichDocument(pullRequest, {
+      organization: `${process.env.ORGANIZATION}`,
+      repository: repository.name,
+      entityType: "pull_request",
+      pullRequestId: pullRequest.id,
+      pullRequestNumber: pullRequest.number,
+    });
     
     cleanPR(pullRequest);
 
@@ -194,10 +215,17 @@ for (const repository of repos) {
 
     if (reviews.length) {
       reviewCount += reviews.length;
-      console.info(reviewCount, `reviews found for repo `, repository.name);
+      console.info(reviews.length, `reviews found for PR `, pullRequest.id);
     }
 
     for (const review of reviews) {
+      enrichDocument(review, {
+        organization: `${process.env.ORGANIZATION}`,
+        repository: repository.name,
+        entityType: "review",
+        pullRequestId: pullRequest.id,
+        pullRequestNumber: pullRequest.number,
+      });
       cleanReview(review);
 
       await ElasticClient.index({
@@ -225,6 +253,13 @@ for (const repository of repos) {
     }
 
     for (const comment of comments) {
+      enrichDocument(comment, {
+        organization: `${process.env.ORGANIZATION}`,
+        repository: repository.name,
+        entityType: "review_comment",
+        pullRequestId: pullRequest.id,
+        pullRequestNumber: pullRequest.number,
+      });
       cleanComment(comment);
 
       await ElasticClient.index({
