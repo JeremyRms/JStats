@@ -5,7 +5,7 @@ import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
 import * as fs from "fs";
 import { enrichDocument } from "./src/document-enrichment.js";
-const { Octokit, App, Action } = pkg;
+const { Octokit } = pkg;
 const { throttling } = pkgthrottling;
 
 dotenv.config();
@@ -61,7 +61,7 @@ const ElasticClient = new Client({
     password: `${process.env.ELASTIC_PASSWORD}`,
   },
   ssl: {
-    ca: fs.readFileSync("/certs/es01/es01.key"),
+    ca: fs.readFileSync("/certs/ca/ca.crt"),
     rejectUnauthorized: false,
   },
 });
