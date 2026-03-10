@@ -5,6 +5,12 @@ import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
 import * as fs from "fs";
 import { enrichDocument } from "./src/document-enrichment.js";
+import {
+  getRepoPullWatermark,
+  loadState,
+  saveState,
+  setRepoPullWatermark,
+} from "./src/state-store.js";
 const { Octokit } = pkg;
 const { throttling } = pkgthrottling;
 
@@ -66,6 +72,11 @@ const ElasticClient = new Client({
   },
 });
 
+const stateFilePath = process.env.STATE_FILE || "./.jstats-state.json";
+const ingestionState = loadState(stateFilePath);
+ingestionState.last_run_started_at = new Date().toISOString();
+console.info(`Using state file ${stateFilePath}`);
+
 // cleaning up before to start
 // ElasticClient.indices.delete({
 //     index: '*'
@@ -120,6 +131,12 @@ console.info(repoCount, `repos found`);
 
 for (const repository of repos) {
   console.info(`pulling data for repository:`, repository.name);
+  const pullWatermark = getRepoPullWatermark(ingestionState, repository.name);
+  let latestPullUpdatedAt = pullWatermark;
+
+  if (pullWatermark) {
+    console.info(`incremental pull sync from ${pullWatermark}`);
+  }
 
   enrichDocument(repository, {
     organization: `${process.env.ORGANIZATION}`,
@@ -167,9 +184,24 @@ for (const repository of repos) {
       owner: `${process.env.ORGANIZATION}`,
       repo: repository.name,
       state: "all",
+      sort: "updated",
+      direction: "desc",
       per_page: 100,
     },
-    (response) => response.data
+    (response, done) => {
+      const nextPullRequests = [];
+
+      for (const pullRequest of response.data) {
+        if (pullWatermark && pullRequest.updated_at <= pullWatermark) {
+          done();
+          break;
+        }
+
+        nextPullRequests.push(pullRequest);
+      }
+
+      return nextPullRequests;
+    }
   );
 
   if (pullRequests.length) {
@@ -178,6 +210,10 @@ for (const repository of repos) {
   }
 
   for (const pullRequest of pullRequests) {
+    if (!latestPullUpdatedAt || pullRequest.updated_at > latestPullUpdatedAt) {
+      latestPullUpdatedAt = pullRequest.updated_at;
+    }
+
     const prDiff = await octokit.rest.pulls.get({
       owner: `${process.env.ORGANIZATION}`,
       repo: repository.name,
@@ -269,10 +305,18 @@ for (const repository of repos) {
       });
     }
   }
+
+  if (latestPullUpdatedAt) {
+    setRepoPullWatermark(ingestionState, repository.name, latestPullUpdatedAt);
+    saveState(stateFilePath, ingestionState);
+  }
 }
 
 console.info(pullCount, `pulls found`);
 console.info(reviewCount, `reviews found`);
+
+ingestionState.last_run_completed_at = new Date().toISOString();
+saveState(stateFilePath, ingestionState);
 
 let port = process.env.PORT;
 let hostname = process.env.HOSTNAME;

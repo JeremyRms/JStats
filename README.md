@@ -37,7 +37,8 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_USERNAME` (default `elastic`)
 - `KIBANA_SPACE` (default `default`)
 - `KIBANA_INSECURE_TLS` (default `true`)
+- `STATE_FILE` (default `./.jstats-state.json`)
 
 ## Notes
 - Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.
-- Ingestion currently runs as a full scan and does not persist incremental sync checkpoints.
+- Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
