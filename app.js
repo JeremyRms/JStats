@@ -94,6 +94,8 @@ let teamsCount = 0;
 let newestPullUpdatedAtInRun = null;
 let oldestPullUpdatedAtInRun = null;
 const indexingProgress = createProgressTracker();
+const prConcurrency = parsePositiveInteger(process.env.PR_CONCURRENCY, 4);
+console.info(`PR concurrency is ${prConcurrency}`);
 
 const members = await octokit.paginate(
   octokit.rest.orgs.listMembers,
@@ -246,7 +248,7 @@ for (const repository of repos) {
     `pull requests in ${repository.name}`
   );
 
-  for (const pullRequest of pullRequests) {
+  await mapWithConcurrency(pullRequests, prConcurrency, async (pullRequest) => {
     if (
       !newestPullUpdatedAtInRepo ||
       isLaterTimestamp(pullRequest.updated_at, newestPullUpdatedAtInRepo)
@@ -264,12 +266,35 @@ for (const repository of repos) {
       latestPullUpdatedAt = pullRequest.updated_at;
     }
 
-    const prDiff = await octokit.rest.pulls.get({
-      owner: `${process.env.ORGANIZATION}`,
-      repo: repository.name,
-      pull_number: pullRequest.number,
-    });
-    pullRequest['diff'] = prDiff?.['data'];
+    const [prDiff, reviews, comments] = await Promise.all([
+      octokit.rest.pulls.get({
+        owner: `${process.env.ORGANIZATION}`,
+        repo: repository.name,
+        pull_number: pullRequest.number,
+      }),
+      octokit.paginate(
+        octokit.rest.pulls.listReviews,
+        {
+          owner: `${process.env.ORGANIZATION}`,
+          repo: repository.name,
+          pull_number: pullRequest.number,
+          per_page: 100,
+        },
+        (response) => response.data
+      ),
+      octokit.paginate(
+        octokit.rest.pulls.listReviewComments,
+        {
+          owner: `${process.env.ORGANIZATION}`,
+          repo: repository.name,
+          pull_number: pullRequest.number,
+          per_page: 100,
+        },
+        (response) => response.data
+      ),
+    ]);
+
+    pullRequest["diff"] = prDiff?.["data"];
 
     enrichDocument(pullRequest, {
       organization: `${process.env.ORGANIZATION}`,
@@ -278,25 +303,17 @@ for (const repository of repos) {
       pullRequestId: pullRequest.id,
       pullRequestNumber: pullRequest.number,
     });
-    
+
     cleanPR(pullRequest);
 
-    await indexDocument(ElasticClient, {
-      id: pullRequest.id,
-      index: "jstats-pullrequest",
-      body: pullRequest,
-    }, indexingProgress);
-
-    // Reviews
-    const reviews = await octokit.paginate(
-      octokit.rest.pulls.listReviews,
+    await indexDocument(
+      ElasticClient,
       {
-        owner: `${process.env.ORGANIZATION}`,
-        repo: repository.name,
-        pull_number: pullRequest.number,
-        per_page: 100,
+        id: pullRequest.id,
+        index: "jstats-pullrequest",
+        body: pullRequest,
       },
-      (response) => response.data
+      indexingProgress
     );
 
     if (reviews.length) {
@@ -322,24 +339,16 @@ for (const repository of repos) {
       });
       cleanReview(review);
 
-      await indexDocument(ElasticClient, {
-        id: review.id,
-        index: "jstats-review",
-        body: review,
-      }, indexingProgress);
+      await indexDocument(
+        ElasticClient,
+        {
+          id: review.id,
+          index: "jstats-review",
+          body: review,
+        },
+        indexingProgress
+      );
     }
-
-    // Comments
-    const comments = await octokit.paginate(
-      octokit.rest.pulls.listReviewComments,
-      {
-        owner: `${process.env.ORGANIZATION}`,
-        repo: repository.name,
-        pull_number: pullRequest.number,
-        per_page: 100,
-      },
-      (response) => response.data
-    );
 
     if (comments.length) {
       commentCount += comments.length;
@@ -364,13 +373,17 @@ for (const repository of repos) {
       });
       cleanComment(comment);
 
-      await indexDocument(ElasticClient, {
-        id: comment.id,
-        index: "jstats-comment",
-        body: comment,
-      }, indexingProgress);
+      await indexDocument(
+        ElasticClient,
+        {
+          id: comment.id,
+          index: "jstats-comment",
+          body: comment,
+        },
+        indexingProgress
+      );
     }
-  }
+  });
 
   if (newestPullUpdatedAtInRepo && oldestPullUpdatedAtInRepo) {
     if (
@@ -721,4 +734,35 @@ function isLaterTimestamp(left, right) {
 
 function isEarlierTimestamp(left, right) {
   return Date.parse(left) < Date.parse(right);
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return fallback;
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  if (!items.length) {
+    return;
+  }
+
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  let nextIndex = 0;
+
+  async function worker() {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+      await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workers = Array.from({ length: limit }, () => worker());
+  await Promise.all(workers);
 }
