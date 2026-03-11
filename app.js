@@ -91,6 +91,8 @@ let reviewCount = 0;
 let commentCount = 0;
 let membersCount = 0;
 let teamsCount = 0;
+let newestPullUpdatedAtInRun = null;
+let oldestPullUpdatedAtInRun = null;
 const indexingProgress = createProgressTracker();
 
 const members = await octokit.paginate(
@@ -139,6 +141,8 @@ for (const repository of repos) {
   console.info(`pulling data for repository:`, repository.name);
   const pullWatermark = getRepoPullWatermark(ingestionState, repository.name);
   let latestPullUpdatedAt = pullWatermark;
+  let newestPullUpdatedAtInRepo = null;
+  let oldestPullUpdatedAtInRepo = null;
 
   if (pullWatermark) {
     console.info(`incremental pull sync from ${pullWatermark}`);
@@ -230,6 +234,19 @@ for (const repository of repos) {
   );
 
   for (const pullRequest of pullRequests) {
+    if (
+      !newestPullUpdatedAtInRepo ||
+      isLaterTimestamp(pullRequest.updated_at, newestPullUpdatedAtInRepo)
+    ) {
+      newestPullUpdatedAtInRepo = pullRequest.updated_at;
+    }
+    if (
+      !oldestPullUpdatedAtInRepo ||
+      isEarlierTimestamp(pullRequest.updated_at, oldestPullUpdatedAtInRepo)
+    ) {
+      oldestPullUpdatedAtInRepo = pullRequest.updated_at;
+    }
+
     if (!latestPullUpdatedAt || pullRequest.updated_at > latestPullUpdatedAt) {
       latestPullUpdatedAt = pullRequest.updated_at;
     }
@@ -340,6 +357,25 @@ for (const repository of repos) {
     }
   }
 
+  if (newestPullUpdatedAtInRepo && oldestPullUpdatedAtInRepo) {
+    if (
+      !newestPullUpdatedAtInRun ||
+      isLaterTimestamp(newestPullUpdatedAtInRepo, newestPullUpdatedAtInRun)
+    ) {
+      newestPullUpdatedAtInRun = newestPullUpdatedAtInRepo;
+    }
+    if (
+      !oldestPullUpdatedAtInRun ||
+      isEarlierTimestamp(oldestPullUpdatedAtInRepo, oldestPullUpdatedAtInRun)
+    ) {
+      oldestPullUpdatedAtInRun = oldestPullUpdatedAtInRepo;
+    }
+
+    console.info(
+      `[repo:${repository.name}] pull updated_at window in this run: newest=${newestPullUpdatedAtInRepo}, oldest=${oldestPullUpdatedAtInRepo}`
+    );
+  }
+
   if (latestPullUpdatedAt) {
     setRepoPullWatermark(ingestionState, repository.name, latestPullUpdatedAt);
     saveState(stateFilePath, ingestionState);
@@ -349,6 +385,16 @@ for (const repository of repos) {
 console.info(pullCount, `pulls found`);
 console.info(reviewCount, `reviews found`);
 console.info(commentCount, `review comments found`);
+if (newestPullUpdatedAtInRun && oldestPullUpdatedAtInRun) {
+  console.info(
+    `pull updated_at window processed this run: newest=${newestPullUpdatedAtInRun}, oldest=${oldestPullUpdatedAtInRun}`
+  );
+  console.info(
+    `last pull data processed in this run (antechronological traversal): ${oldestPullUpdatedAtInRun}`
+  );
+} else {
+  console.info("no pull requests processed in this run");
+}
 if (indexingProgress.indexed < indexingProgress.planned) {
   reportProgress(indexingProgress);
 }
@@ -623,4 +669,12 @@ function reportProgress(progress, context) {
     console.info(line);
     progress.lastLoggedIndexed = done;
   }
+}
+
+function isLaterTimestamp(left, right) {
+  return Date.parse(left) > Date.parse(right);
+}
+
+function isEarlierTimestamp(left, right) {
+  return Date.parse(left) < Date.parse(right);
 }
