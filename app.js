@@ -215,7 +215,9 @@ for (const repository of repos) {
 
   if (pullRequests.length) {
     pullCount += pullRequests.length;
-    console.info(pullCount, `pulls tally`);
+    console.info(
+      `[repo:${repository.name}] pull requests in scope: ${pullRequests.length} (run total: ${pullCount})`
+    );
   }
 
   for (const pullRequest of pullRequests) {
@@ -260,7 +262,9 @@ for (const repository of repos) {
 
     if (reviews.length) {
       reviewCount += reviews.length;
-      console.info(reviews.length, `reviews found for PR `, pullRequest.id);
+      console.info(
+        `[repo:${repository.name}] [pr:${pullRequest.number}] reviews for this PR: ${reviews.length} (run total: ${reviewCount})`
+      );
     }
 
     for (const review of reviews) {
@@ -294,7 +298,9 @@ for (const repository of repos) {
 
     if (comments.length) {
       commentCount += comments.length;
-      console.info(commentCount, `comments found for PR `, pullRequest.id);
+      console.info(
+        `[repo:${repository.name}] [pr:${pullRequest.number}] review comments for this PR: ${comments.length} (run total: ${commentCount})`
+      );
     }
 
     for (const comment of comments) {
@@ -323,6 +329,7 @@ for (const repository of repos) {
 
 console.info(pullCount, `pulls found`);
 console.info(reviewCount, `reviews found`);
+console.info(commentCount, `review comments found`);
 
 ingestionState.last_run_completed_at = new Date().toISOString();
 saveState(stateFilePath, ingestionState);
