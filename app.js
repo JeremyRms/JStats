@@ -134,20 +134,29 @@ const repos = await octokit.paginate(
 );
 
 repoCount = repos.length;
-console.info(repoCount, `repos found`);
+logInfoWithProgress(indexingProgress, `${repoCount} repos found`);
 addPlanned(indexingProgress, repos.length, "repositories");
 
 for (const repository of repos) {
-  console.info(`pulling data for repository:`, repository.name);
+  logInfoWithProgress(
+    indexingProgress,
+    `pulling data for repository: ${repository.name}`
+  );
   const pullWatermark = getRepoPullWatermark(ingestionState, repository.name);
   let latestPullUpdatedAt = pullWatermark;
   let newestPullUpdatedAtInRepo = null;
   let oldestPullUpdatedAtInRepo = null;
 
   if (pullWatermark) {
-    console.info(`incremental pull sync from ${pullWatermark}`);
+    logInfoWithProgress(
+      indexingProgress,
+      `incremental pull sync from ${pullWatermark}`
+    );
   }
-  console.info(`ignoring pull updates older than ${minPullUpdatedAt}`);
+  logInfoWithProgress(
+    indexingProgress,
+    `ignoring pull updates older than ${minPullUpdatedAt}`
+  );
 
   enrichDocument(repository, {
     organization: `${process.env.ORGANIZATION}`,
@@ -172,7 +181,10 @@ for (const repository of repos) {
   );
 
   teamsCount = teams.length;
-  console.info(teamsCount, ` teams found for repo `, repository.name);
+  logInfoWithProgress(
+    indexingProgress,
+    `${teamsCount} teams found for repo ${repository.name}`
+  );
   addPlanned(indexingProgress, teams.length, `teams in ${repository.name}`);
 
   for (const team of teams) {
@@ -223,7 +235,8 @@ for (const repository of repos) {
 
   if (pullRequests.length) {
     pullCount += pullRequests.length;
-    console.info(
+    logInfoWithProgress(
+      indexingProgress,
       `[repo:${repository.name}] pull requests in scope: ${pullRequests.length} (run total: ${pullCount})`
     );
   }
@@ -288,7 +301,8 @@ for (const repository of repos) {
 
     if (reviews.length) {
       reviewCount += reviews.length;
-      console.info(
+      logInfoWithProgress(
+        indexingProgress,
         `[repo:${repository.name}] [pr:${pullRequest.number}] reviews for this PR: ${reviews.length} (run total: ${reviewCount})`
       );
     }
@@ -329,7 +343,8 @@ for (const repository of repos) {
 
     if (comments.length) {
       commentCount += comments.length;
-      console.info(
+      logInfoWithProgress(
+        indexingProgress,
         `[repo:${repository.name}] [pr:${pullRequest.number}] review comments for this PR: ${comments.length} (run total: ${commentCount})`
       );
     }
@@ -371,7 +386,8 @@ for (const repository of repos) {
       oldestPullUpdatedAtInRun = oldestPullUpdatedAtInRepo;
     }
 
-    console.info(
+    logInfoWithProgress(
+      indexingProgress,
       `[repo:${repository.name}] pull updated_at window in this run: newest=${newestPullUpdatedAtInRepo}, oldest=${oldestPullUpdatedAtInRepo}`
     );
   }
@@ -382,23 +398,26 @@ for (const repository of repos) {
   }
 }
 
-console.info(pullCount, `pulls found`);
-console.info(reviewCount, `reviews found`);
-console.info(commentCount, `review comments found`);
+logInfoWithProgress(indexingProgress, `${pullCount} pulls found`);
+logInfoWithProgress(indexingProgress, `${reviewCount} reviews found`);
+logInfoWithProgress(indexingProgress, `${commentCount} review comments found`);
 if (newestPullUpdatedAtInRun && oldestPullUpdatedAtInRun) {
-  console.info(
+  logInfoWithProgress(
+    indexingProgress,
     `pull updated_at window processed this run: newest=${newestPullUpdatedAtInRun}, oldest=${oldestPullUpdatedAtInRun}`
   );
-  console.info(
+  logInfoWithProgress(
+    indexingProgress,
     `last pull data processed in this run (antechronological traversal): ${oldestPullUpdatedAtInRun}`
   );
 } else {
-  console.info("no pull requests processed in this run");
+  logInfoWithProgress(indexingProgress, "no pull requests processed in this run");
 }
 if (indexingProgress.indexed < indexingProgress.planned) {
   reportProgress(indexingProgress);
 }
-console.info(
+logInfoWithProgress(
+  indexingProgress,
   `indexing complete: ${indexingProgress.indexed}/${indexingProgress.planned} documents indexed`
 );
 
@@ -623,6 +642,7 @@ function createProgressTracker() {
     indexed: 0,
     width: 30,
     lastLoggedIndexed: -1,
+    isRendered: false,
   };
 }
 
@@ -632,7 +652,6 @@ function addPlanned(progress, count, label) {
   }
 
   progress.planned += count;
-  reportProgress(progress, `planned ${count} ${label}`);
 }
 
 async function indexDocument(client, params, progress) {
@@ -654,8 +673,10 @@ function reportProgress(progress, context) {
 
   if (process.stdout.isTTY) {
     process.stdout.write(`\r${line}`);
+    progress.isRendered = true;
     if (total > 0 && done >= total) {
       process.stdout.write("\n");
+      progress.isRendered = false;
     }
     return;
   }
@@ -669,6 +690,14 @@ function reportProgress(progress, context) {
     console.info(line);
     progress.lastLoggedIndexed = done;
   }
+}
+
+function logInfoWithProgress(progress, message) {
+  if (process.stdout.isTTY && progress.isRendered) {
+    process.stdout.write("\n");
+    progress.isRendered = false;
+  }
+  console.info(message);
 }
 
 function isLaterTimestamp(left, right) {
