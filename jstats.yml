@@ -2,7 +2,7 @@ version: '2.2'
 
 services:
   jstats:
-    image: node
+    image: node:20
     container_name: jstats
     command: >
       bash -c '
