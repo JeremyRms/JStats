@@ -8,7 +8,7 @@ if [ ! -f ".env" ]; then
     touch .env
     {
         echo '# docker specific settings'
-        echo 'COMPOSE_PROJECT_NAME=JStats'
+        echo 'COMPOSE_PROJECT_NAME=jstats'
         echo 'CERTS_DIR=/usr/share/elasticsearch/config/certificates'
         echo 'VERSION=7.14.0'
         echo '# app configuration settings'
