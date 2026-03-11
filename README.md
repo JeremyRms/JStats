@@ -44,3 +44,4 @@ KIBANA_PASSWORD='<elastic-password>' \
 - Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
 - Ingestion skips pull updates older than `MIN_PULL_UPDATED_AT` (defaults to the start of 2025).
+- Ingestion prints a progress bar while indexing (`indexed/planned` documents).

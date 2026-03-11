@@ -91,6 +91,7 @@ let reviewCount = 0;
 let commentCount = 0;
 let membersCount = 0;
 let teamsCount = 0;
+const indexingProgress = createProgressTracker();
 
 const members = await octokit.paginate(
   octokit.rest.orgs.listMembers,
@@ -101,6 +102,7 @@ const members = await octokit.paginate(
 );
 membersCount = members.length;
 console.info(membersCount, ` members found`);
+addPlanned(indexingProgress, members.length, "members");
 
 for (const member of members) {
   enrichDocument(member, {
@@ -109,11 +111,11 @@ for (const member of members) {
   });
   cleanMember(member);
 
-  await ElasticClient.index({
+  await indexDocument(ElasticClient, {
     id: member.id,
     index: "jstats-member",
     body: member,
-  });
+  }, indexingProgress);
 }
 
 const repos = await octokit.paginate(
@@ -131,6 +133,7 @@ const repos = await octokit.paginate(
 
 repoCount = repos.length;
 console.info(repoCount, `repos found`);
+addPlanned(indexingProgress, repos.length, "repositories");
 
 for (const repository of repos) {
   console.info(`pulling data for repository:`, repository.name);
@@ -149,11 +152,11 @@ for (const repository of repos) {
   });
   cleanRepo(repository);
 
-  await ElasticClient.index({
+  await indexDocument(ElasticClient, {
     id: repository.id,
     index: "jstats-repository",
     body: repository,
-  });
+  }, indexingProgress);
 
   const teams = await octokit.paginate(
     octokit.rest.repos.listTeams,
@@ -166,6 +169,7 @@ for (const repository of repos) {
 
   teamsCount = teams.length;
   console.info(teamsCount, ` teams found for repo `, repository.name);
+  addPlanned(indexingProgress, teams.length, `teams in ${repository.name}`);
 
   for (const team of teams) {
     enrichDocument(team, {
@@ -175,11 +179,11 @@ for (const repository of repos) {
     });
     cleanTeam(team);
 
-    await ElasticClient.index({
+    await indexDocument(ElasticClient, {
       id: team.id,
       index: "jstats-teams",
       body: team,
-    });
+    }, indexingProgress);
   }
 
   const pullRequests = await octokit.paginate(
@@ -219,6 +223,11 @@ for (const repository of repos) {
       `[repo:${repository.name}] pull requests in scope: ${pullRequests.length} (run total: ${pullCount})`
     );
   }
+  addPlanned(
+    indexingProgress,
+    pullRequests.length,
+    `pull requests in ${repository.name}`
+  );
 
   for (const pullRequest of pullRequests) {
     if (!latestPullUpdatedAt || pullRequest.updated_at > latestPullUpdatedAt) {
@@ -242,11 +251,11 @@ for (const repository of repos) {
     
     cleanPR(pullRequest);
 
-    await ElasticClient.index({
+    await indexDocument(ElasticClient, {
       id: pullRequest.id,
       index: "jstats-pullrequest",
       body: pullRequest,
-    });
+    }, indexingProgress);
 
     // Reviews
     const reviews = await octokit.paginate(
@@ -266,6 +275,11 @@ for (const repository of repos) {
         `[repo:${repository.name}] [pr:${pullRequest.number}] reviews for this PR: ${reviews.length} (run total: ${reviewCount})`
       );
     }
+    addPlanned(
+      indexingProgress,
+      reviews.length,
+      `reviews in ${repository.name}#${pullRequest.number}`
+    );
 
     for (const review of reviews) {
       enrichDocument(review, {
@@ -277,11 +291,11 @@ for (const repository of repos) {
       });
       cleanReview(review);
 
-      await ElasticClient.index({
+      await indexDocument(ElasticClient, {
         id: review.id,
         index: "jstats-review",
         body: review,
-      });
+      }, indexingProgress);
     }
 
     // Comments
@@ -302,6 +316,11 @@ for (const repository of repos) {
         `[repo:${repository.name}] [pr:${pullRequest.number}] review comments for this PR: ${comments.length} (run total: ${commentCount})`
       );
     }
+    addPlanned(
+      indexingProgress,
+      comments.length,
+      `review comments in ${repository.name}#${pullRequest.number}`
+    );
 
     for (const comment of comments) {
       enrichDocument(comment, {
@@ -313,11 +332,11 @@ for (const repository of repos) {
       });
       cleanComment(comment);
 
-      await ElasticClient.index({
+      await indexDocument(ElasticClient, {
         id: comment.id,
         index: "jstats-comment",
         body: comment,
-      });
+      }, indexingProgress);
     }
   }
 
@@ -330,6 +349,12 @@ for (const repository of repos) {
 console.info(pullCount, `pulls found`);
 console.info(reviewCount, `reviews found`);
 console.info(commentCount, `review comments found`);
+if (indexingProgress.indexed < indexingProgress.planned) {
+  reportProgress(indexingProgress);
+}
+console.info(
+  `indexing complete: ${indexingProgress.indexed}/${indexingProgress.planned} documents indexed`
+);
 
 ingestionState.last_run_completed_at = new Date().toISOString();
 saveState(stateFilePath, ingestionState);
@@ -543,5 +568,59 @@ function cleanTeam(team) {
     if (key.search(/_url/) != -1) {
       delete team[key];
     }
+  }
+}
+
+function createProgressTracker() {
+  return {
+    planned: 0,
+    indexed: 0,
+    width: 30,
+    lastLoggedIndexed: -1,
+  };
+}
+
+function addPlanned(progress, count, label) {
+  if (!count) {
+    return;
+  }
+
+  progress.planned += count;
+  reportProgress(progress, `planned ${count} ${label}`);
+}
+
+async function indexDocument(client, params, progress) {
+  await client.index(params);
+  progress.indexed += 1;
+  reportProgress(progress);
+}
+
+function reportProgress(progress, context) {
+  const total = progress.planned;
+  const done = progress.indexed;
+  const ratio = total > 0 ? Math.min(done / total, 1) : 0;
+  const percent = total > 0 ? Math.floor(ratio * 100) : 0;
+  const filled = Math.round(ratio * progress.width);
+  const bar = `${"=".repeat(filled)}${"-".repeat(progress.width - filled)}`;
+  const line = `[${bar}] ${percent}% ${done}/${total} docs indexed${
+    context ? ` | ${context}` : ""
+  }`;
+
+  if (process.stdout.isTTY) {
+    process.stdout.write(`\r${line}`);
+    if (total > 0 && done >= total) {
+      process.stdout.write("\n");
+    }
+    return;
+  }
+
+  const shouldLog =
+    Boolean(context) ||
+    done === total ||
+    done - progress.lastLoggedIndexed >= 50;
+
+  if (shouldLog) {
+    console.info(line);
+    progress.lastLoggedIndexed = done;
   }
 }
