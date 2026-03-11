@@ -38,7 +38,9 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_SPACE` (default `default`)
 - `KIBANA_INSECURE_TLS` (default `true`)
 - `STATE_FILE` (default `./.jstats-state.json`)
+- `MIN_PULL_UPDATED_AT` (default `2025-01-01T00:00:00Z`)
 
 ## Notes
 - Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
+- Ingestion skips pull updates older than `MIN_PULL_UPDATED_AT` (defaults to the start of 2025).

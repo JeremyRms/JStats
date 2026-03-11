@@ -73,9 +73,12 @@ const ElasticClient = new Client({
 });
 
 const stateFilePath = process.env.STATE_FILE || "./.jstats-state.json";
+const minPullUpdatedAt =
+  process.env.MIN_PULL_UPDATED_AT || "2025-01-01T00:00:00Z";
 const ingestionState = loadState(stateFilePath);
 ingestionState.last_run_started_at = new Date().toISOString();
 console.info(`Using state file ${stateFilePath}`);
+console.info(`Minimum pull updated_at is ${minPullUpdatedAt}`);
 
 // cleaning up before to start
 // ElasticClient.indices.delete({
@@ -137,6 +140,7 @@ for (const repository of repos) {
   if (pullWatermark) {
     console.info(`incremental pull sync from ${pullWatermark}`);
   }
+  console.info(`ignoring pull updates older than ${minPullUpdatedAt}`);
 
   enrichDocument(repository, {
     organization: `${process.env.ORGANIZATION}`,
@@ -192,6 +196,11 @@ for (const repository of repos) {
       const nextPullRequests = [];
 
       for (const pullRequest of response.data) {
+        if (pullRequest.updated_at < minPullUpdatedAt) {
+          done();
+          break;
+        }
+
         if (pullWatermark && pullRequest.updated_at <= pullWatermark) {
           done();
           break;
