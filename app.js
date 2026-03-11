@@ -420,6 +420,7 @@ logInfoWithProgress(
   indexingProgress,
   `indexing complete: ${indexingProgress.indexed}/${indexingProgress.planned} documents indexed`
 );
+flushProgressLine(indexingProgress);
 
 ingestionState.last_run_completed_at = new Date().toISOString();
 saveState(stateFilePath, ingestionState);
@@ -642,7 +643,8 @@ function createProgressTracker() {
     indexed: 0,
     width: 30,
     lastLoggedIndexed: -1,
-    isRendered: false,
+    latestMessage: "",
+    lastLineLength: 0,
   };
 }
 
@@ -661,22 +663,28 @@ async function indexDocument(client, params, progress) {
 }
 
 function reportProgress(progress, context) {
+  if (context) {
+    progress.latestMessage = context;
+  }
+
   const total = progress.planned;
   const done = progress.indexed;
   const ratio = total > 0 ? Math.min(done / total, 1) : 0;
   const percent = total > 0 ? Math.floor(ratio * 100) : 0;
   const filled = Math.round(ratio * progress.width);
   const bar = `${"=".repeat(filled)}${"-".repeat(progress.width - filled)}`;
+  const detail = context || progress.latestMessage;
   const line = `[${bar}] ${percent}% ${done}/${total} docs indexed${
-    context ? ` | ${context}` : ""
+    detail ? ` | ${detail}` : ""
   }`;
 
   if (process.stdout.isTTY) {
-    process.stdout.write(`\r${line}`);
-    progress.isRendered = true;
+    const suffix = " ".repeat(Math.max(progress.lastLineLength - line.length, 0));
+    process.stdout.write(`\r${line}${suffix}`);
+    progress.lastLineLength = line.length;
     if (total > 0 && done >= total) {
       process.stdout.write("\n");
-      progress.isRendered = false;
+      progress.lastLineLength = 0;
     }
     return;
   }
@@ -693,11 +701,18 @@ function reportProgress(progress, context) {
 }
 
 function logInfoWithProgress(progress, message) {
-  if (process.stdout.isTTY && progress.isRendered) {
-    process.stdout.write("\n");
-    progress.isRendered = false;
+  if (process.stdout.isTTY) {
+    reportProgress(progress, message);
+    return;
   }
   console.info(message);
+}
+
+function flushProgressLine(progress) {
+  if (process.stdout.isTTY && progress.lastLineLength > 0) {
+    process.stdout.write("\n");
+    progress.lastLineLength = 0;
+  }
 }
 
 function isLaterTimestamp(left, right) {
