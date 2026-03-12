@@ -39,6 +39,9 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_INSECURE_TLS` (default `true`)
 - `STATE_FILE` (default `./.jstats-state.json`)
 - `MIN_PULL_UPDATED_AT` (default `2025-01-01T00:00:00Z`)
+- `PR_CONCURRENCY` (default `4`)
+- `RATE_LIMIT_RESET_BUFFER_SECONDS` (default `5`)
+- `RATE_LIMIT_RECOVERY_RETRIES` (default `4`)
 
 ## Notes
 - Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.
