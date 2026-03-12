@@ -157,14 +157,26 @@ const repos = await runGithubCallWithRateLimitRecovery("repos.listForOrg", () =>
       state: "all",
     },
     (response) => response.data
-  )
+      )
 );
 
-repoCount = repos.length;
-logInfoWithProgress(indexingProgress, `${repoCount} repos found`);
-addPlanned(indexingProgress, repos.length, "repositories");
+const nonArchivedRepos = repos.filter((repository) => !repository.archived);
+const archivedRepoCount = repos.length - nonArchivedRepos.length;
 
-for (const repository of repos) {
+repoCount = nonArchivedRepos.length;
+logInfoWithProgress(
+  indexingProgress,
+  `${repoCount} non-archived repos found`
+);
+if (archivedRepoCount > 0) {
+  logInfoWithProgress(
+    indexingProgress,
+    `skipping ${archivedRepoCount} archived repos`
+  );
+}
+addPlanned(indexingProgress, nonArchivedRepos.length, "repositories");
+
+for (const repository of nonArchivedRepos) {
   logInfoWithProgress(
     indexingProgress,
     `pulling data for repository: ${repository.name}`
