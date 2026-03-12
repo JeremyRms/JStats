@@ -267,12 +267,17 @@ for (const repository of repos) {
         }
       )
   );
+  pullRequests.sort(
+    (left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at)
+  );
 
   if (pullRequests.length) {
     pullCount += pullRequests.length;
+    const newestPullInBatch = pullRequests[0]?.updated_at;
+    const oldestPullInBatch = pullRequests[pullRequests.length - 1]?.updated_at;
     logInfoWithProgress(
       indexingProgress,
-      `[repo:${repository.name}] pull requests in scope: ${pullRequests.length} (run total: ${pullCount})`
+      `[repo:${repository.name}] pull requests in scope: ${pullRequests.length} (run total: ${pullCount}, newest=${newestPullInBatch}, oldest=${oldestPullInBatch})`
     );
   }
   addPlanned(
