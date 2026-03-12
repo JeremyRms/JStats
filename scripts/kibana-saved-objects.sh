@@ -50,7 +50,6 @@ if [[ "$KIBANA_SPACE" != "default" ]]; then
 fi
 
 curl_args=(
-  --fail
   --silent
   --show-error
   -u "$KIBANA_USERNAME:$KIBANA_PASSWORD"
@@ -65,6 +64,7 @@ case "$command" in
   export)
     mkdir -p "$(dirname "$file_path")"
     curl "${curl_args[@]}" \
+      --fail \
       -X POST "$api_base/api/saved_objects/_export" \
       -H "Content-Type: application/json" \
       -d '{"type":["dashboard","lens","search","index-pattern","url","config"],"includeReferencesDeep":true,"excludeExportDetails":true}' \
@@ -79,7 +79,8 @@ case "$command" in
 
     sanitized_file="$(mktemp "${TMPDIR:-/tmp}/kibana-import.XXXXXX.ndjson")"
     response_file="$(mktemp "${TMPDIR:-/tmp}/kibana-import-response.XXXXXX.json")"
-    trap 'rm -f "$sanitized_file" "$response_file"' EXIT
+    headers_file="$(mktemp "${TMPDIR:-/tmp}/kibana-import-headers.XXXXXX.txt")"
+    trap 'rm -f "$sanitized_file" "$response_file" "$headers_file"' EXIT
 
     node -e '
       const fs = require("fs");
@@ -106,6 +107,7 @@ case "$command" in
 
     import_status="$(curl "${curl_args[@]}" \
       --output "$response_file" \
+      --dump-header "$headers_file" \
       --write-out "%{http_code}" \
       -X POST "$api_base/api/saved_objects/_import?overwrite=true" \
       -F "file=@$sanitized_file" || true)"
@@ -120,7 +122,14 @@ case "$command" in
     if [[ "$import_status" -lt 200 || "$import_status" -ge 300 ]]; then
       echo "Kibana import failed with HTTP $import_status" >&2
       echo "Response body:" >&2
-      cat "$response_file" >&2
+      if [[ -s "$response_file" ]]; then
+        cat "$response_file" >&2
+      else
+        echo "(empty body)" >&2
+      fi
+      echo >&2
+      echo "Response headers:" >&2
+      cat "$headers_file" >&2
       echo >&2
       exit 1
     fi
