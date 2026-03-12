@@ -67,7 +67,7 @@ case "$command" in
     curl "${curl_args[@]}" \
       -X POST "$api_base/api/saved_objects/_export" \
       -H "Content-Type: application/json" \
-      -d '{"type":["dashboard","lens","search","index-pattern","url","config"],"includeReferencesDeep":true}' \
+      -d '{"type":["dashboard","lens","search","index-pattern","url","config"],"includeReferencesDeep":true,"excludeExportDetails":true}' \
       -o "$file_path"
     echo "Exported Kibana saved objects to $file_path"
     ;;
@@ -77,9 +77,35 @@ case "$command" in
       exit 1
     fi
 
+    sanitized_file="$(mktemp "${TMPDIR:-/tmp}/kibana-import.XXXXXX.ndjson")"
+    trap 'rm -f "$sanitized_file"' EXIT
+
+    node -e '
+      const fs = require("fs");
+      const input = process.argv[1];
+      const output = process.argv[2];
+      const lines = fs.readFileSync(input, "utf8").split(/\r?\n/).filter(Boolean);
+      const objects = [];
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (typeof parsed.type === "string" && parsed.type.length > 0) {
+            objects.push(JSON.stringify(parsed));
+          }
+        } catch (error) {
+          // Keep import strict: malformed lines are ignored from sanitization output.
+        }
+      }
+      if (!objects.length) {
+        console.error("No importable saved objects found in NDJSON file.");
+        process.exit(1);
+      }
+      fs.writeFileSync(output, `${objects.join("\n")}\n`, "utf8");
+    ' "$file_path" "$sanitized_file"
+
     curl "${curl_args[@]}" \
       -X POST "$api_base/api/saved_objects/_import?overwrite=true" \
-      -F "file=@$file_path"
+      -F "file=@$sanitized_file"
     echo
     echo "Imported Kibana saved objects from $file_path"
     ;;
