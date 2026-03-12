@@ -67,7 +67,7 @@ case "$command" in
     curl "${curl_args[@]}" \
       -X POST "$api_base/api/saved_objects/_export" \
       -H "Content-Type: application/json" \
-      -d '{"type":["dashboard","lens","index-pattern","url","config"],"includeReferencesDeep":true}' \
+      -d '{"type":["dashboard","lens","search","index-pattern","url","config"],"includeReferencesDeep":true}' \
       -o "$file_path"
     echo "Exported Kibana saved objects to $file_path"
     ;;
