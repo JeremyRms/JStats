@@ -16,6 +16,14 @@ const { throttling } = pkgthrottling;
 
 dotenv.config();
 const minimumRateLimitRetryAfterSeconds = 30;
+const rateLimitResetBufferSeconds = parsePositiveInteger(
+  process.env.RATE_LIMIT_RESET_BUFFER_SECONDS,
+  5
+);
+const rateLimitRecoveryRetries = parsePositiveInteger(
+  process.env.RATE_LIMIT_RECOVERY_RETRIES,
+  4
+);
 
 const server = http.createServer((request, response) => {
   response.statusCode = 200;
@@ -32,43 +40,41 @@ const octokit = new JStatsOctokit({
   log: {
     debug: () => {},
     info: () => {},
-    warn: console.warn,
+    warn: (message) => logNotice(String(message)),
     error: console.error,
   },
   throttle: {
     onRateLimit: async (retryAfter, options) => {
-      octokit.log.warn(
+      logNotice(
         `Request quota exhausted for request ${options.method} ${options.url}`
       );
 
       // Retry twice after hitting a rate limit error, then give up
       if (options.request.retryCount <= 2) {
-        const additionalDelaySeconds = Math.max(
-          minimumRateLimitRetryAfterSeconds - retryAfter,
-          0
+        const waitSeconds = Math.max(
+          retryAfter,
+          minimumRateLimitRetryAfterSeconds
         );
+        const additionalDelaySeconds = Math.max(waitSeconds - retryAfter, 0);
         if (additionalDelaySeconds > 0) {
           await sleep(additionalDelaySeconds * 1000);
         }
-        console.info(
-          `Retrying after ${Math.max(
-            retryAfter,
-            minimumRateLimitRetryAfterSeconds
-          )} seconds due to rate limit`
-        );
+        logNotice(`Retrying after ${waitSeconds} seconds due to rate limit`);
         return true;
       }
     },
     onAbuseLimit: (retryAfter, options) => {
       // does not retry, only logs a warning
-      octokit.log.warn(
+      logNotice(
         `Abuse detected for request ${options.method} ${options.url}`
       );
     },
   },
 });
 
-await octokit.rest.users.getAuthenticated().then(({ data }) => {
+await runGithubCallWithRateLimitRecovery("users.getAuthenticated", () =>
+  octokit.rest.users.getAuthenticated()
+).then(({ data }) => {
   console.info(`Hello`, data.login);
 });
 
@@ -110,12 +116,16 @@ const indexingProgress = createProgressTracker();
 const prConcurrency = parsePositiveInteger(process.env.PR_CONCURRENCY, 4);
 console.info(`PR concurrency is ${prConcurrency}`);
 
-const members = await octokit.paginate(
-  octokit.rest.orgs.listMembers,
-  {
-    org: `${process.env.ORGANIZATION}`,
-  },
-  (response) => response.data
+const members = await runGithubCallWithRateLimitRecovery(
+  "orgs.listMembers",
+  () =>
+    octokit.paginate(
+      octokit.rest.orgs.listMembers,
+      {
+        org: `${process.env.ORGANIZATION}`,
+      },
+      (response) => response.data
+    )
 );
 membersCount = members.length;
 console.info(membersCount, ` members found`);
@@ -135,17 +145,19 @@ for (const member of members) {
   }, indexingProgress);
 }
 
-const repos = await octokit.paginate(
-  octokit.rest.repos.listForOrg,
-  {
-    org: `${process.env.ORGANIZATION}`,
-    type: "private",
-    sort: "updated",
-    direction: "desc",
-    per_page: 100,
-    state: "all",
-  },
-  (response) => response.data
+const repos = await runGithubCallWithRateLimitRecovery("repos.listForOrg", () =>
+  octokit.paginate(
+    octokit.rest.repos.listForOrg,
+    {
+      org: `${process.env.ORGANIZATION}`,
+      type: "private",
+      sort: "updated",
+      direction: "desc",
+      per_page: 100,
+      state: "all",
+    },
+    (response) => response.data
+  )
 );
 
 repoCount = repos.length;
@@ -186,13 +198,17 @@ for (const repository of repos) {
     body: repository,
   }, indexingProgress);
 
-  const teams = await octokit.paginate(
-    octokit.rest.repos.listTeams,
-    {
-      owner: `${process.env.ORGANIZATION}`,
-      repo: repository.name,
-    },
-    (response) => response.data
+  const teams = await runGithubCallWithRateLimitRecovery(
+    `repos.listTeams ${repository.name}`,
+    () =>
+      octokit.paginate(
+        octokit.rest.repos.listTeams,
+        {
+          owner: `${process.env.ORGANIZATION}`,
+          repo: repository.name,
+        },
+        (response) => response.data
+      )
   );
 
   teamsCount = teams.length;
@@ -217,35 +233,39 @@ for (const repository of repos) {
     }, indexingProgress);
   }
 
-  const pullRequests = await octokit.paginate(
-    octokit.rest.pulls.list,
-    {
-      owner: `${process.env.ORGANIZATION}`,
-      repo: repository.name,
-      state: "all",
-      sort: "updated",
-      direction: "desc",
-      per_page: 100,
-    },
-    (response, done) => {
-      const nextPullRequests = [];
+  const pullRequests = await runGithubCallWithRateLimitRecovery(
+    `pulls.list ${repository.name}`,
+    () =>
+      octokit.paginate(
+        octokit.rest.pulls.list,
+        {
+          owner: `${process.env.ORGANIZATION}`,
+          repo: repository.name,
+          state: "all",
+          sort: "updated",
+          direction: "desc",
+          per_page: 100,
+        },
+        (response, done) => {
+          const nextPullRequests = [];
 
-      for (const pullRequest of response.data) {
-        if (pullRequest.updated_at < minPullUpdatedAt) {
-          done();
-          break;
+          for (const pullRequest of response.data) {
+            if (pullRequest.updated_at < minPullUpdatedAt) {
+              done();
+              break;
+            }
+
+            if (pullWatermark && pullRequest.updated_at <= pullWatermark) {
+              done();
+              break;
+            }
+
+            nextPullRequests.push(pullRequest);
+          }
+
+          return nextPullRequests;
         }
-
-        if (pullWatermark && pullRequest.updated_at <= pullWatermark) {
-          done();
-          break;
-        }
-
-        nextPullRequests.push(pullRequest);
-      }
-
-      return nextPullRequests;
-    }
+      )
   );
 
   if (pullRequests.length) {
@@ -280,30 +300,42 @@ for (const repository of repos) {
     }
 
     const [prDiff, reviews, comments] = await Promise.all([
-      octokit.rest.pulls.get({
-        owner: `${process.env.ORGANIZATION}`,
-        repo: repository.name,
-        pull_number: pullRequest.number,
-      }),
-      octokit.paginate(
-        octokit.rest.pulls.listReviews,
-        {
-          owner: `${process.env.ORGANIZATION}`,
-          repo: repository.name,
-          pull_number: pullRequest.number,
-          per_page: 100,
-        },
-        (response) => response.data
+      runGithubCallWithRateLimitRecovery(
+        `pulls.get ${repository.name}#${pullRequest.number}`,
+        () =>
+          octokit.rest.pulls.get({
+            owner: `${process.env.ORGANIZATION}`,
+            repo: repository.name,
+            pull_number: pullRequest.number,
+          })
       ),
-      octokit.paginate(
-        octokit.rest.pulls.listReviewComments,
-        {
-          owner: `${process.env.ORGANIZATION}`,
-          repo: repository.name,
-          pull_number: pullRequest.number,
-          per_page: 100,
-        },
-        (response) => response.data
+      runGithubCallWithRateLimitRecovery(
+        `pulls.listReviews ${repository.name}#${pullRequest.number}`,
+        () =>
+          octokit.paginate(
+            octokit.rest.pulls.listReviews,
+            {
+              owner: `${process.env.ORGANIZATION}`,
+              repo: repository.name,
+              pull_number: pullRequest.number,
+              per_page: 100,
+            },
+            (response) => response.data
+          )
+      ),
+      runGithubCallWithRateLimitRecovery(
+        `pulls.listReviewComments ${repository.name}#${pullRequest.number}`,
+        () =>
+          octokit.paginate(
+            octokit.rest.pulls.listReviewComments,
+            {
+              owner: `${process.env.ORGANIZATION}`,
+              repo: repository.name,
+              pull_number: pullRequest.number,
+              per_page: 100,
+            },
+            (response) => response.data
+          )
       ),
     ]);
 
@@ -753,6 +785,70 @@ function sleep(milliseconds) {
   return new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+function logNotice(message) {
+  if (process.stdout.isTTY) {
+    process.stdout.write(`\n${message}\n`);
+    return;
+  }
+  console.info(message);
+}
+
+function isGithubRateLimitError(error) {
+  if (error?.status !== 403) {
+    return false;
+  }
+
+  const remaining = error?.response?.headers?.["x-ratelimit-remaining"];
+  if (remaining === "0") {
+    return true;
+  }
+
+  return /\brate limit exceeded\b/i.test(error?.message || "");
+}
+
+function getRateLimitRetryAfterSeconds(error) {
+  const retryAfterHeader = parsePositiveInteger(
+    error?.response?.headers?.["retry-after"],
+    0
+  );
+  if (retryAfterHeader > 0) {
+    return Math.max(retryAfterHeader, minimumRateLimitRetryAfterSeconds);
+  }
+
+  const resetEpochSeconds = parsePositiveInteger(
+    error?.response?.headers?.["x-ratelimit-reset"],
+    0
+  );
+  if (resetEpochSeconds > 0) {
+    const secondsUntilReset = Math.max(
+      Math.ceil(resetEpochSeconds - Date.now() / 1000),
+      0
+    );
+    return Math.max(secondsUntilReset, minimumRateLimitRetryAfterSeconds);
+  }
+
+  return minimumRateLimitRetryAfterSeconds;
+}
+
+async function runGithubCallWithRateLimitRecovery(label, operation) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isGithubRateLimitError(error) || attempt >= rateLimitRecoveryRetries) {
+        throw error;
+      }
+
+      const waitSeconds =
+        getRateLimitRetryAfterSeconds(error) + rateLimitResetBufferSeconds;
+      logNotice(
+        `[rate-limit] ${label} failed after throttled retries; waiting ${waitSeconds} seconds before retry ${attempt + 1}/${rateLimitRecoveryRetries}`
+      );
+      await sleep(waitSeconds * 1000);
+    }
+  }
 }
 
 function parsePositiveInteger(value, fallback) {
