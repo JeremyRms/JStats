@@ -78,7 +78,8 @@ case "$command" in
     fi
 
     sanitized_file="$(mktemp "${TMPDIR:-/tmp}/kibana-import.XXXXXX.ndjson")"
-    trap 'rm -f "$sanitized_file"' EXIT
+    response_file="$(mktemp "${TMPDIR:-/tmp}/kibana-import-response.XXXXXX.json")"
+    trap 'rm -f "$sanitized_file" "$response_file"' EXIT
 
     node -e '
       const fs = require("fs");
@@ -103,9 +104,28 @@ case "$command" in
       fs.writeFileSync(output, `${objects.join("\n")}\n`, "utf8");
     ' "$file_path" "$sanitized_file"
 
-    curl "${curl_args[@]}" \
+    import_status="$(curl "${curl_args[@]}" \
+      --output "$response_file" \
+      --write-out "%{http_code}" \
       -X POST "$api_base/api/saved_objects/_import?overwrite=true" \
-      -F "file=@$sanitized_file"
+      -F "file=@$sanitized_file" || true)"
+
+    if [[ ! "${import_status:-}" =~ ^[0-9]{3}$ ]]; then
+      echo "Kibana import failed before receiving an HTTP status code." >&2
+      cat "$response_file" >&2 || true
+      echo >&2
+      exit 1
+    fi
+
+    if [[ "$import_status" -lt 200 || "$import_status" -ge 300 ]]; then
+      echo "Kibana import failed with HTTP $import_status" >&2
+      echo "Response body:" >&2
+      cat "$response_file" >&2
+      echo >&2
+      exit 1
+    fi
+
+    cat "$response_file"
     echo
     echo "Imported Kibana saved objects from $file_path"
     ;;
