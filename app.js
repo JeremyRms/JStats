@@ -15,6 +15,7 @@ const { Octokit } = pkg;
 const { throttling } = pkgthrottling;
 
 dotenv.config();
+const minimumRateLimitRetryAfterSeconds = 30;
 
 const server = http.createServer((request, response) => {
   response.statusCode = 200;
@@ -35,14 +36,26 @@ const octokit = new JStatsOctokit({
     error: console.error,
   },
   throttle: {
-    onRateLimit: (retryAfter, options) => {
+    onRateLimit: async (retryAfter, options) => {
       octokit.log.warn(
         `Request quota exhausted for request ${options.method} ${options.url}`
       );
 
       // Retry twice after hitting a rate limit error, then give up
       if (options.request.retryCount <= 2) {
-        console.log(`Retrying after ${retryAfter} seconds!`);
+        const additionalDelaySeconds = Math.max(
+          minimumRateLimitRetryAfterSeconds - retryAfter,
+          0
+        );
+        if (additionalDelaySeconds > 0) {
+          await sleep(additionalDelaySeconds * 1000);
+        }
+        console.info(
+          `Retrying after ${Math.max(
+            retryAfter,
+            minimumRateLimitRetryAfterSeconds
+          )} seconds due to rate limit`
+        );
         return true;
       }
     },
@@ -734,6 +747,12 @@ function isLaterTimestamp(left, right) {
 
 function isEarlierTimestamp(left, right) {
   return Date.parse(left) < Date.parse(right);
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function parsePositiveInteger(value, fallback) {
