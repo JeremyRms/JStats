@@ -56,3 +56,10 @@ test("buildScopedJql applies project scope and custom jql", () => {
     "project in (ARCH,ENG) AND (statusCategory != Done)"
   );
 });
+
+test("buildScopedJql keeps order by outside the scoped filter", () => {
+  assert.equal(
+    buildScopedJql(["ARCH", "ENG"], "statusCategory != Done ORDER BY updated DESC"),
+    "project in (ARCH,ENG) AND (statusCategory != Done) ORDER BY updated DESC"
+  );
+});

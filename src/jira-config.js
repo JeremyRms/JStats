@@ -35,13 +35,24 @@ export function buildScopedJql(projectKeys = [], jql = "") {
   const scope = projectKeys.length
     ? `project in (${projectKeys.join(",")})`
     : "";
-  const filter = jql.trim();
+  const raw = jql.trim();
+  const orderByMatch = raw.match(/\border\s+by\b/i);
+  const filter = orderByMatch
+    ? raw.slice(0, orderByMatch.index).trim()
+    : raw;
+  const orderBy = orderByMatch ? raw.slice(orderByMatch.index).trim() : "";
+
+  let scoped = scope || filter;
 
   if (scope && filter) {
-    return `${scope} AND (${filter})`;
+    scoped = `${scope} AND (${filter})`;
   }
 
-  return scope || filter;
+  if (orderBy) {
+    return scoped ? `${scoped} ${orderBy}` : orderBy;
+  }
+
+  return scoped;
 }
 
 function normalizeBaseUrl(baseUrl) {

@@ -98,7 +98,7 @@ test("createJiraClient searchIssues applies configured project scope", async () 
 
   assert.equal(
     requestUrl,
-    "https://example.atlassian.net/rest/api/3/search?jql=project+in+%28ARCH%2CENG%29+AND+%28statusCategory+%21%3D+Done%29&maxResults=10"
+    "https://example.atlassian.net/rest/api/3/search/jql?jql=project+in+%28ARCH%2CENG%29+AND+%28statusCategory+%21%3D+Done%29&maxResults=10"
   );
 });
 
