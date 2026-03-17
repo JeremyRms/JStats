@@ -38,7 +38,7 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_SPACE` (default `default`)
 - `KIBANA_INSECURE_TLS` (default `true`)
 - `API_KEY_FILE` (default `~/.jstats/github_api_key`)
-- `JIRA_API_TOKEN_FILE` (default `~/.jstats/jira_api_token`)
+- `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
 - `MIN_PULL_UPDATED_AT` (default `2025-01-01T00:00:00Z`)
 - `PR_CONCURRENCY` (default `4`)
@@ -52,9 +52,10 @@ Default locations:
 
 ```bash
 mkdir -p ~/.jstats
+mkdir -p ~/.jira
 printf '%s\n' '<github-token>' > ~/.jstats/github_api_key
-printf '%s\n' '<jira-api-token>' > ~/.jstats/jira_api_token
-chmod 600 ~/.jstats/github_api_key ~/.jstats/jira_api_token
+printf '%s\n' '<jira-api-token>' > ~/.jira/api_token
+chmod 600 ~/.jstats/github_api_key ~/.jira/api_token
 ```
 
 If a secret file exists, it overrides the value from `.env`. If it does not exist, the `.env` value is used.

@@ -4,7 +4,7 @@ import * as path from "path";
 
 const DEFAULT_SECRET_FILES = {
   API_KEY: path.join(os.homedir(), ".jstats", "github_api_key"),
-  JIRA_API_TOKEN: path.join(os.homedir(), ".jstats", "jira_api_token"),
+  JIRA_API_TOKEN: path.join(os.homedir(), ".jira", "api_token"),
 };
 
 export function loadSecretEnvValues(env = process.env) {
@@ -32,4 +32,3 @@ function readSecretFile(filePath) {
     return null;
   }
 }
-
