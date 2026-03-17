@@ -23,6 +23,7 @@ if [ ! -f ".env" ]; then
         echo 'JIRA_BASE_URL='
         echo 'JIRA_EMAIL='
         echo 'JIRA_JQL='
+        echo 'JIRA_PROJECT_KEYS='
         echo 'ELASTIC_PASSWORD=ELASTICUSERPASSWORD'
     } > .env
 

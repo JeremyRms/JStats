@@ -41,6 +41,7 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `JIRA_BASE_URL` (example `https://your-org.atlassian.net`)
 - `JIRA_EMAIL`
 - `JIRA_JQL`
+- `JIRA_PROJECT_KEYS` (comma-separated Jira project keys to track)
 - `API_KEY_FILE` (default `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
@@ -74,6 +75,7 @@ ORGANIZATION=your-github-org
 JIRA_BASE_URL=https://your-org.atlassian.net
 JIRA_EMAIL=you@example.com
 JIRA_JQL=
+JIRA_PROJECT_KEYS=
 ```
 
 ## Notes
@@ -81,3 +83,4 @@ JIRA_JQL=
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
 - Ingestion skips pull updates older than `MIN_PULL_UPDATED_AT` (defaults to the start of 2025).
 - Ingestion prints a progress bar while indexing (`indexed/planned` documents).
+- Jira tracking scope is documented in [docs/jira-tracking-plan.md](/Users/jeremy/Repos/experiments/JStats/docs/jira-tracking-plan.md).
