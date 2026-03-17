@@ -65,6 +65,13 @@ chmod 600 ~/.jstats/github_api_key ~/.jira/api_token
 
 If a secret file exists, it overrides the value from `.env`. If it does not exist, the `.env` value is used.
 
+## Jira auth check
+Verify Jira credentials and print the authenticated Jira user:
+
+```bash
+npm run jira:auth-check
+```
+
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.
 

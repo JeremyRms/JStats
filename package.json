@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "jira:auth-check": "node scripts/jira-auth-check.js"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^7.13.0",
