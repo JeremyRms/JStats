@@ -72,6 +72,17 @@ Verify Jira credentials and print the authenticated Jira user:
 npm run jira:auth-check
 ```
 
+## Jira issue sync
+Fetch Jira issues within the configured project scope and index them into Elasticsearch:
+
+```bash
+npm run jira:sync-issues
+```
+
+Optional:
+
+- `JIRA_ISSUE_SYNC_MAX_RESULTS` (default `100`)
+
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.
 
