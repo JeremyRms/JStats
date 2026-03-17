@@ -37,6 +37,10 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_USERNAME` (default `elastic`)
 - `KIBANA_SPACE` (default `default`)
 - `KIBANA_INSECURE_TLS` (default `true`)
+- `ORGANIZATION` (GitHub organization to ingest)
+- `JIRA_BASE_URL` (example `https://your-org.atlassian.net`)
+- `JIRA_EMAIL`
+- `JIRA_JQL`
 - `API_KEY_FILE` (default `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
@@ -59,6 +63,18 @@ chmod 600 ~/.jstats/github_api_key ~/.jira/api_token
 ```
 
 If a secret file exists, it overrides the value from `.env`. If it does not exist, the `.env` value is used.
+
+## Organization-specific config
+Organization-specific values should live in `.env`, not in code or committed docs.
+
+Example:
+
+```bash
+ORGANIZATION=your-github-org
+JIRA_BASE_URL=https://your-org.atlassian.net
+JIRA_EMAIL=you@example.com
+JIRA_JQL=
+```
 
 ## Notes
 - Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.

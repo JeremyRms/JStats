@@ -20,6 +20,9 @@ if [ ! -f ".env" ]; then
         echo 'ELASTIC_PORT=9200'
         echo 'TIMEZONE=Asia/Bangkok'
         echo 'ORGANIZATION=GITHUBORGANIZATION'
+        echo 'JIRA_BASE_URL='
+        echo 'JIRA_EMAIL='
+        echo 'JIRA_JQL='
         echo 'ELASTIC_PASSWORD=ELASTICUSERPASSWORD'
     } > .env
 
