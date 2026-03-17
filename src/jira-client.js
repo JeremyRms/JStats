@@ -16,6 +16,18 @@ export function createJiraClient(config, options = {}) {
       return requestJson(pathname, searchParams);
     },
 
+    async getIssue(issueKey, options = {}) {
+      return requestJson(`/rest/api/3/issue/${issueKey}`, options);
+    },
+
+    async getIssueChangelog(issueKey, options = {}) {
+      return requestJson(`/rest/api/3/issue/${issueKey}/changelog`, options);
+    },
+
+    async listStatuses() {
+      return requestJson("/rest/api/3/status");
+    },
+
     async searchIssues(options = {}) {
       return requestJson("/rest/api/3/search/jql", {
         ...options,

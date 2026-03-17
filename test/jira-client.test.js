@@ -102,6 +102,65 @@ test("createJiraClient searchIssues applies configured project scope", async () 
   );
 });
 
+test("createJiraClient requests issue changelog", async () => {
+  let requestUrl;
+
+  const client = createJiraClient(
+    {
+      baseUrl: "https://example.atlassian.net",
+      email: "user@example.com",
+      apiToken: "secret-token",
+      projectKeys: [],
+    },
+    {
+      fetchImpl: async (url) => {
+        requestUrl = String(url);
+        return {
+          ok: true,
+          async json() {
+            return { values: [] };
+          },
+        };
+      },
+    }
+  );
+
+  await client.getIssueChangelog("ENG-1", { startAt: 0, maxResults: 100 });
+
+  assert.equal(
+    requestUrl,
+    "https://example.atlassian.net/rest/api/3/issue/ENG-1/changelog?startAt=0&maxResults=100"
+  );
+});
+
+test("createJiraClient lists statuses", async () => {
+  let requestUrl;
+
+  const client = createJiraClient(
+    {
+      baseUrl: "https://example.atlassian.net",
+      email: "user@example.com",
+      apiToken: "secret-token",
+      projectKeys: [],
+    },
+    {
+      fetchImpl: async (url) => {
+        requestUrl = String(url);
+        return {
+          ok: true,
+          async json() {
+            return [];
+          },
+        };
+      },
+    }
+  );
+
+  await client.listStatuses();
+
+  assert.equal(requestUrl, "https://example.atlassian.net/rest/api/3/status");
+});
+
 test("createJiraClient surfaces non-200 responses", async () => {
   const client = createJiraClient(
     {
