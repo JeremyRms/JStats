@@ -37,11 +37,27 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_USERNAME` (default `elastic`)
 - `KIBANA_SPACE` (default `default`)
 - `KIBANA_INSECURE_TLS` (default `true`)
+- `API_KEY_FILE` (default `~/.jstats/github_api_key`)
+- `JIRA_API_TOKEN_FILE` (default `~/.jstats/jira_api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
 - `MIN_PULL_UPDATED_AT` (default `2025-01-01T00:00:00Z`)
 - `PR_CONCURRENCY` (default `4`)
 - `RATE_LIMIT_RESET_BUFFER_SECONDS` (default `5`)
 - `RATE_LIMIT_RECOVERY_RETRIES` (default `4`)
+
+## Secret files
+GitHub and Jira tokens can be loaded from files in your home directory before falling back to `.env`.
+
+Default locations:
+
+```bash
+mkdir -p ~/.jstats
+printf '%s\n' '<github-token>' > ~/.jstats/github_api_key
+printf '%s\n' '<jira-api-token>' > ~/.jstats/jira_api_token
+chmod 600 ~/.jstats/github_api_key ~/.jstats/jira_api_token
+```
+
+If a secret file exists, it overrides the value from `.env`. If it does not exist, the `.env` value is used.
 
 ## Notes
 - Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.

@@ -5,6 +5,7 @@ import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
 import * as fs from "fs";
 import { enrichDocument } from "./src/document-enrichment.js";
+import { loadSecretEnvValues } from "./src/secret-env.js";
 import {
   getRepoPullWatermark,
   loadState,
@@ -15,6 +16,7 @@ const { Octokit } = pkg;
 const { throttling } = pkgthrottling;
 
 dotenv.config();
+loadSecretEnvValues();
 const minimumRateLimitRetryAfterSeconds = 30;
 const rateLimitResetBufferSeconds = parsePositiveInteger(
   process.env.RATE_LIMIT_RESET_BUFFER_SECONDS,
