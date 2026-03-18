@@ -7,6 +7,7 @@ import * as path from "path";
 import {
   getRepoPullWatermark,
   loadState,
+  removeRepos,
   saveState,
   setRepoPullWatermark,
 } from "../src/state-store.js";
@@ -32,4 +33,19 @@ test("set/get repo watermark and save/load roundtrip", () => {
     "2026-03-10T10:00:00Z"
   );
   assert.ok(loaded.repos["repo-one"].last_run_at);
+});
+
+test("removeRepos deletes repository state entries", () => {
+  const state = loadState("/tmp/this-file-should-not-exist-jstats-state.json");
+  setRepoPullWatermark(state, "repo-one", "2026-03-10T10:00:00Z");
+  setRepoPullWatermark(state, "repo-two", "2026-03-11T10:00:00Z");
+
+  const removed = removeRepos(state, ["repo-two", "repo-three"]);
+
+  assert.equal(removed, 1);
+  assert.equal(getRepoPullWatermark(state, "repo-two"), undefined);
+  assert.equal(
+    getRepoPullWatermark(state, "repo-one"),
+    "2026-03-10T10:00:00Z"
+  );
 });
