@@ -6,7 +6,9 @@ JStats ingests GitHub organization data and stores it in Elasticsearch for Kiban
 - Ingestion service: `app.js`
 - Local Elastic/Kibana Docker setup: `elastic-docker-tls.yml`, `create-certs.yml`, `jstats.yml`
 - Bootstrap helper: `bootstrap.sh`
-- Versioned Kibana saved objects: `dashboards/teamwork.ndjson`
+- Versioned Kibana saved objects:
+  - `dashboards/teamwork.ndjson`
+  - `dashboards/jira-teamwork.ndjson`
 
 ## Local startup
 Run:
@@ -30,6 +32,11 @@ KIBANA_PASSWORD='<elastic-password>' \
 ```bash
 KIBANA_PASSWORD='<elastic-password>' \
 ./scripts/kibana-saved-objects.sh import dashboards/teamwork.ndjson
+```
+
+```bash
+KIBANA_PASSWORD='<elastic-password>' \
+./scripts/kibana-saved-objects.sh import dashboards/jira-teamwork.ndjson
 ```
 
 ### Optional environment variables
@@ -135,7 +142,7 @@ JIRA_PROJECT_KEYS=
 ```
 
 ## Notes
-- Saved objects include the `Teamwork` dashboard and related Lens visualizations/index patterns.
+- Saved objects include the `Teamwork` and `Jira Teamwork` dashboards with their related Lens visualizations/index patterns.
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
 - Ingestion skips pull updates older than `MIN_PULL_UPDATED_AT` (defaults to the start of 2025).
 - Ingestion prints a progress bar while indexing (`indexed/planned` documents).
