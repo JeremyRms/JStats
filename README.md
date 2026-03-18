@@ -83,6 +83,23 @@ Optional:
 
 - `JIRA_ISSUE_SYNC_MAX_RESULTS` (default `100`)
 
+## Jira event sync
+Fetch Jira issue changelogs and index separate `created`, `updated`, and `completed` events into Elasticsearch:
+
+```bash
+npm run jira:sync-events
+```
+
+Current event semantics:
+
+- `created`: one event per issue from `fields.created`
+- `updated`: one event per changelog history entry that changes non-completion fields or moves between non-done statuses
+- `completed`: one event per changelog history entry that moves the issue into a Jira status whose category is `done`
+
+Optional:
+
+- `JIRA_EVENT_SYNC_MAX_ISSUES` (default `20`)
+
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.
 

@@ -35,6 +35,7 @@ We want Jira work to be separated into four event types:
    Triggered from issue updates after creation.
    Base source candidate: changelog history.
    Excludes the initial create event.
+   Current modeling rule: emit one `updated` event for each changelog history that is not only a transition into a `done` status category.
 
 3. `commented`
    Triggered from issue comments.
@@ -44,6 +45,7 @@ We want Jira work to be separated into four event types:
 4. `completed`
    Triggered when an issue moves into a done/completed state.
    Base field candidates: status transition changelog and `resolutiondate`.
+   Current modeling rule: emit one `completed` event for each changelog history whose `status` change moves to a status category of `done`.
 
 ## Notes
 
@@ -51,3 +53,4 @@ We want Jira work to be separated into four event types:
 - Comments should be modeled separately from generic updates.
 - Project filtering should happen before indexing.
 - Final JQL is still to be defined.
+- Reopened issues can produce multiple `completed` events over time if they move into `done` more than once.
