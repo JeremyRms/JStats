@@ -47,3 +47,16 @@ export function setRepoPullWatermark(state, repositoryName, watermark) {
   state.repos[repositoryName].last_pull_updated_at = watermark;
   state.repos[repositoryName].last_run_at = new Date().toISOString();
 }
+
+export function removeRepos(state, repositoryNames = []) {
+  let removed = 0;
+
+  for (const repositoryName of repositoryNames) {
+    if (state?.repos?.[repositoryName]) {
+      delete state.repos[repositoryName];
+      removed += 1;
+    }
+  }
+
+  return removed;
+}
