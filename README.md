@@ -72,6 +72,25 @@ Verify Jira credentials and print the authenticated Jira user:
 npm run jira:auth-check
 ```
 
+## GitHub archived repository cleanup
+Remove Elasticsearch documents and local state entries for repositories that are now archived in GitHub:
+
+```bash
+npm run github:cleanup-archived-repos
+```
+
+Optional:
+
+- `ARCHIVED_REPO_CLEANUP_DRY_RUN=true` to report counts without deleting anything
+
+The cleanup targets these indices:
+
+- `jstats-repository`
+- `jstats-teams`
+- `jstats-pullrequest`
+- `jstats-review`
+- `jstats-comment`
+
 ## Jira issue sync
 Fetch Jira issues within the configured project scope and index them into Elasticsearch:
 
