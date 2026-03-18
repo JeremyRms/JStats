@@ -5,6 +5,10 @@ import { createElasticClient } from "../src/elastic-client.js";
 import { createJiraClient } from "../src/jira-client.js";
 import { resolveJiraAuthConfig } from "../src/jira-config.js";
 import { buildJiraIssueDocument } from "../src/jira-issue-document.js";
+import {
+  appendJqlClauses,
+  resolveJiraSyncWindow,
+} from "../src/jira-sync-window.js";
 import { loadSecretEnvValues } from "../src/secret-env.js";
 
 dotenv.config();
@@ -14,6 +18,7 @@ try {
   const jiraConfig = resolveJiraAuthConfig();
   const jiraClient = createJiraClient(jiraConfig);
   const elasticClient = createElasticClient();
+  const syncWindow = resolveJiraSyncWindow();
   const maxResults = parsePositiveInteger(
     process.env.JIRA_ISSUE_SYNC_MAX_RESULTS,
     100
@@ -39,13 +44,18 @@ try {
 
   let startAt = 0;
   let indexed = 0;
+  const baseJql = appendJqlClauses(
+    process.env.JIRA_JQL || "",
+    syncWindow?.updatedJql
+  );
+  const searchJql = baseJql ? `${baseJql} ORDER BY updated DESC` : "ORDER BY updated DESC";
 
   while (indexed < maxResults) {
     const page = await jiraClient.searchIssues({
       startAt,
       maxResults: Math.min(pageSize, maxResults - indexed),
       fields,
-      jql: `${process.env.JIRA_JQL || ""} ORDER BY updated DESC`.trim(),
+      jql: searchJql,
     });
 
     const issues = page.issues || [];
@@ -72,6 +82,11 @@ try {
     }
   }
 
+  if (syncWindow) {
+    console.info(
+      `Issue sync window: ${syncWindow.start} to ${syncWindow.end} (updated desc)`
+    );
+  }
   console.info(`Indexed ${indexed} Jira issues into jstats-jira-issue`);
 } catch (error) {
   console.error(error.message);
@@ -86,4 +101,3 @@ function parsePositiveInteger(value, fallback) {
 
   return fallback;
 }
-

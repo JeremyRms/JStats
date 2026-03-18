@@ -82,6 +82,7 @@ npm run jira:sync-issues
 Optional:
 
 - `JIRA_ISSUE_SYNC_MAX_RESULTS` (default `100`)
+- `JIRA_SYNC_YEAR` to restrict issue selection to issues updated in a given year, for example `2026`
 
 ## Jira event sync
 Fetch Jira issue changelogs and index separate `created`, `updated`, and `completed` events into Elasticsearch:
@@ -99,6 +100,7 @@ Current event semantics:
 Optional:
 
 - `JIRA_EVENT_SYNC_MAX_ISSUES` (default `20`)
+- `JIRA_SYNC_YEAR` to restrict candidate issues to those updated in a given year and to index only events whose `event_timestamp` falls within that year
 
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.

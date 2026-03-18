@@ -9,6 +9,12 @@ import {
   buildStatusCategoryById,
 } from "../src/jira-event-document.js";
 import { resolveJiraAuthConfig } from "../src/jira-config.js";
+import {
+  appendJqlClauses,
+  isTimestampInWindow,
+  resolveJiraSyncWindow,
+  sortDocumentsByTimestampDesc,
+} from "../src/jira-sync-window.js";
 import { loadSecretEnvValues } from "../src/secret-env.js";
 
 dotenv.config();
@@ -19,6 +25,7 @@ try {
   const jiraClient = createJiraClient(jiraConfig);
   const elasticClient = createElasticClient();
   const statusCategoryById = buildStatusCategoryById(await jiraClient.listStatuses());
+  const syncWindow = resolveJiraSyncWindow();
   const maxIssues = parsePositiveInteger(
     process.env.JIRA_EVENT_SYNC_MAX_ISSUES,
     20
@@ -29,13 +36,18 @@ try {
   let startAt = 0;
   let syncedIssues = 0;
   let indexedEvents = 0;
+  const baseJql = appendJqlClauses(
+    process.env.JIRA_JQL || "",
+    syncWindow?.updatedJql
+  );
+  const searchJql = baseJql ? `${baseJql} ORDER BY updated DESC` : "ORDER BY updated DESC";
 
   while (syncedIssues < maxIssues) {
     const page = await jiraClient.searchIssues({
       startAt,
       maxResults: Math.min(pageSize, maxIssues - syncedIssues),
       fields,
-      jql: `${process.env.JIRA_JQL || ""} ORDER BY updated DESC`.trim(),
+      jql: searchJql,
     });
 
     const issues = page.issues || [];
@@ -44,15 +56,13 @@ try {
     }
 
     for (const issue of issues) {
+      const eventDocuments = [];
       const createdDoc = buildCreatedEventDocument(issue, {
         baseUrl: jiraConfig.baseUrl,
       });
-      await elasticClient.index({
-        index: "jstats-jira-event",
-        id: createdDoc.id,
-        body: createdDoc,
-      });
-      indexedEvents += 1;
+      if (isTimestampInWindow(createdDoc.event_timestamp, syncWindow)) {
+        eventDocuments.push(createdDoc);
+      }
 
       const histories = await getAllChangelogEntries(jiraClient, issue.key);
       for (const history of histories) {
@@ -63,14 +73,18 @@ try {
           { baseUrl: jiraConfig.baseUrl }
         );
 
-        for (const doc of docs) {
-          await elasticClient.index({
-            index: "jstats-jira-event",
-            id: doc.id,
-            body: doc,
-          });
-          indexedEvents += 1;
-        }
+        eventDocuments.push(
+          ...docs.filter((doc) => isTimestampInWindow(doc.event_timestamp, syncWindow))
+        );
+      }
+
+      for (const doc of sortDocumentsByTimestampDesc(eventDocuments)) {
+        await elasticClient.index({
+          index: "jstats-jira-event",
+          id: doc.id,
+          body: doc,
+        });
+        indexedEvents += 1;
       }
 
       syncedIssues += 1;
@@ -85,6 +99,11 @@ try {
     }
   }
 
+  if (syncWindow) {
+    console.info(
+      `Event sync window: ${syncWindow.start} to ${syncWindow.end} (updated desc, events filtered by timestamp)`
+    );
+  }
   console.info(`Indexed ${indexedEvents} Jira events into jstats-jira-event`);
 } catch (error) {
   console.error(error.message);
@@ -120,4 +139,3 @@ function parsePositiveInteger(value, fallback) {
 
   return fallback;
 }
-
