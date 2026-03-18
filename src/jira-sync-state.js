@@ -5,6 +5,7 @@ export function buildJiraSyncSignature(context = {}) {
     searchJql: context.searchJql || "",
     projectKeys: [...(context.projectKeys || [])].sort(),
     syncYear: context.syncYear || null,
+    paginationMode: context.paginationMode || null,
   });
 }
 

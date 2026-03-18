@@ -46,7 +46,8 @@ try {
   );
   const fields = ["summary", "project", "created", "creator"].join(",");
 
-  let startAt = 0;
+  let nextPageToken;
+  let pageIssueOffset = 0;
   let syncedIssues = 0;
   let indexedEvents = 0;
   const baseJql = appendJqlClauses(
@@ -60,28 +61,41 @@ try {
     searchJql,
     projectKeys: jiraConfig.projectKeys,
     syncYear: syncWindow?.year,
+    paginationMode: "nextPageToken",
   });
   const checkpoint = resumeEnabled
     ? getJiraSyncCheckpoint(state, "events", signature)
     : null;
 
   if (checkpoint) {
-    startAt = checkpoint.next_start_at || 0;
+    nextPageToken = checkpoint.next_page_token || undefined;
+    pageIssueOffset = checkpoint.page_issue_offset || 0;
     syncedIssues = checkpoint.synced_issues || 0;
     indexedEvents = checkpoint.indexed_events || 0;
-    console.info(`Resuming Jira event sync from offset ${startAt}`);
+    console.info(
+      `Resuming Jira event sync from page token ${nextPageToken ? "present" : "start"} at page offset ${pageIssueOffset}`
+    );
   }
 
   while (syncedIssues < maxIssues) {
     const page = await jiraClient.searchIssues({
-      startAt,
       maxResults: Math.min(pageSize, maxIssues - syncedIssues),
       fields,
       jql: searchJql,
+      nextPageToken,
     });
 
-    const issues = page.issues || [];
+    const pageIssues = page.issues || [];
+    const issues = pageIssueOffset > 0 ? pageIssues.slice(pageIssueOffset) : pageIssues;
     if (issues.length === 0) {
+      if (pageIssues.length > 0 && pageIssueOffset > 0) {
+        nextPageToken = page.nextPageToken || undefined;
+        pageIssueOffset = 0;
+        if (!nextPageToken) {
+          break;
+        }
+        continue;
+      }
       break;
     }
 
@@ -114,7 +128,8 @@ try {
 
       syncedIssues += 1;
       setJiraSyncCheckpoint(state, "events", signature, {
-        next_start_at: startAt + issueIndex + 1,
+        next_page_token: nextPageToken || null,
+        page_issue_offset: pageIssueOffset + issueIndex + 1,
         synced_issues: syncedIssues,
         indexed_events: indexedEvents,
         page_size: pageSize,
@@ -125,8 +140,18 @@ try {
       );
     }
 
-    startAt += issues.length;
-    if (issues.length < pageSize) {
+    pageIssueOffset = 0;
+    nextPageToken = page.nextPageToken || undefined;
+    setJiraSyncCheckpoint(state, "events", signature, {
+      next_page_token: nextPageToken || null,
+      page_issue_offset: 0,
+      synced_issues: syncedIssues,
+      indexed_events: indexedEvents,
+      page_size: pageSize,
+    });
+    saveState(stateFilePath, state);
+
+    if (page.isLast || !nextPageToken) {
       break;
     }
   }

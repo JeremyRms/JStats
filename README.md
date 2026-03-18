@@ -149,6 +149,7 @@ JIRA_PROJECT_KEYS=
 - Saved objects include the `Teamwork` and `Jira Teamwork` dashboards with their related Lens visualizations/index patterns.
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
 - Jira issue and event syncs persist crash-recovery checkpoints in `.jstats-state.json`; completed runs clear their checkpoints.
+- Jira search pagination uses Jira `nextPageToken` cursors, not numeric offsets.
 - Ingestion skips pull updates older than `MIN_PULL_UPDATED_AT` (defaults to the start of 2025).
 - Ingestion prints a progress bar while indexing (`indexed/planned` documents).
 - Jira tracking scope is documented in [docs/jira-tracking-plan.md](/Users/jeremy/Repos/experiments/JStats/docs/jira-tracking-plan.md).

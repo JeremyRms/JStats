@@ -102,6 +102,42 @@ test("createJiraClient searchIssues applies configured project scope", async () 
   );
 });
 
+test("createJiraClient searchIssues forwards nextPageToken instead of startAt", async () => {
+  let requestUrl;
+
+  const client = createJiraClient(
+    {
+      baseUrl: "https://example.atlassian.net",
+      email: "user@example.com",
+      apiToken: "secret-token",
+      projectKeys: [],
+    },
+    {
+      fetchImpl: async (url) => {
+        requestUrl = String(url);
+        return {
+          ok: true,
+          async json() {
+            return { issues: [] };
+          },
+        };
+      },
+    }
+  );
+
+  await client.searchIssues({
+    jql: "statusCategory != Done",
+    maxResults: 10,
+    nextPageToken: "abc123",
+    startAt: 30,
+  });
+
+  assert.equal(
+    requestUrl,
+    "https://example.atlassian.net/rest/api/3/search/jql?jql=statusCategory+%21%3D+Done&maxResults=10&nextPageToken=abc123"
+  );
+});
+
 test("createJiraClient requests issue changelog", async () => {
   let requestUrl;
 

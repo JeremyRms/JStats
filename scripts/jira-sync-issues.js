@@ -55,7 +55,8 @@ try {
     "parent",
   ].join(",");
 
-  let startAt = 0;
+  let nextPageToken;
+  let pageIssueOffset = 0;
   let indexed = 0;
   const baseJql = appendJqlClauses(
     process.env.JIRA_JQL || "",
@@ -68,27 +69,40 @@ try {
     searchJql,
     projectKeys: jiraConfig.projectKeys,
     syncYear: syncWindow?.year,
+    paginationMode: "nextPageToken",
   });
   const checkpoint = resumeEnabled
     ? getJiraSyncCheckpoint(state, "issues", signature)
     : null;
 
   if (checkpoint) {
-    startAt = checkpoint.next_start_at || 0;
+    nextPageToken = checkpoint.next_page_token || undefined;
+    pageIssueOffset = checkpoint.page_issue_offset || 0;
     indexed = checkpoint.indexed || 0;
-    console.info(`Resuming Jira issue sync from offset ${startAt}`);
+    console.info(
+      `Resuming Jira issue sync from page token ${nextPageToken ? "present" : "start"} at page offset ${pageIssueOffset}`
+    );
   }
 
   while (indexed < maxResults) {
     const page = await jiraClient.searchIssues({
-      startAt,
       maxResults: Math.min(pageSize, maxResults - indexed),
       fields,
       jql: searchJql,
+      nextPageToken,
     });
 
-    const issues = page.issues || [];
+    const pageIssues = page.issues || [];
+    const issues = pageIssueOffset > 0 ? pageIssues.slice(pageIssueOffset) : pageIssues;
     if (issues.length === 0) {
+      if (pageIssues.length > 0 && pageIssueOffset > 0) {
+        nextPageToken = page.nextPageToken || undefined;
+        pageIssueOffset = 0;
+        if (!nextPageToken) {
+          break;
+        }
+        continue;
+      }
       break;
     }
 
@@ -100,9 +114,11 @@ try {
     await bulkIndexDocuments(elasticClient, "jstats-jira-issue", documents);
     indexed += documents.length;
 
-    const nextStartAt = startAt + issues.length;
+    pageIssueOffset = 0;
+    nextPageToken = page.nextPageToken || undefined;
     setJiraSyncCheckpoint(state, "issues", signature, {
-      next_start_at: nextStartAt,
+      next_page_token: nextPageToken || null,
+      page_issue_offset: pageIssueOffset,
       indexed,
       page_size: pageSize,
     });
@@ -111,8 +127,7 @@ try {
       `Indexed Jira issues ${indexed}/${maxResults} (page size ${issues.length}, newest=${issues[0]?.key}, oldest=${issues[issues.length - 1]?.key})`
     );
 
-    startAt = nextStartAt;
-    if (issues.length < pageSize) {
+    if (page.isLast || !nextPageToken) {
       break;
     }
   }

@@ -31,6 +31,7 @@ export function createJiraClient(config, options = {}) {
     async searchIssues(options = {}) {
       return requestJson("/rest/api/3/search/jql", {
         ...options,
+        startAt: undefined,
         jql: buildScopedJql(config.projectKeys, options.jql || ""),
       });
     },
