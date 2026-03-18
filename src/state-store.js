@@ -4,6 +4,7 @@ import * as path from "path";
 const DEFAULT_STATE = {
   version: 1,
   repos: {},
+  jira_sync: {},
 };
 
 export function loadState(filePath) {
@@ -14,11 +15,14 @@ export function loadState(filePath) {
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
     const repos = parsed?.repos && typeof parsed.repos === "object" ? parsed.repos : {};
+    const jiraSync =
+      parsed?.jira_sync && typeof parsed.jira_sync === "object" ? parsed.jira_sync : {};
 
     return {
       ...DEFAULT_STATE,
       ...parsed,
       repos,
+      jira_sync: jiraSync,
     };
   } catch (error) {
     console.warn(`Unable to parse state file ${filePath}, using defaults`, error);

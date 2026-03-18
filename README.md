@@ -108,7 +108,9 @@ npm run jira:sync-issues
 Optional:
 
 - `JIRA_ISSUE_SYNC_MAX_RESULTS` (default `100`)
+- `JIRA_SYNC_PAGE_SIZE` (default `100`)
 - `JIRA_SYNC_YEAR` to restrict issue selection to issues updated in a given year, for example `2026`
+- `JIRA_SYNC_RESUME` (default `true`) to resume from the last saved Jira sync checkpoint after a crash
 
 ## Jira event sync
 Fetch Jira issue changelogs and index separate `created`, `updated`, and `completed` events into Elasticsearch:
@@ -126,7 +128,9 @@ Current event semantics:
 Optional:
 
 - `JIRA_EVENT_SYNC_MAX_ISSUES` (default `20`)
+- `JIRA_SYNC_PAGE_SIZE` (default `100`)
 - `JIRA_SYNC_YEAR` to restrict candidate issues to those updated in a given year and to index only events whose `event_timestamp` falls within that year
+- `JIRA_SYNC_RESUME` (default `true`) to resume from the last saved Jira sync checkpoint after a crash
 
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.
@@ -144,6 +148,7 @@ JIRA_PROJECT_KEYS=
 ## Notes
 - Saved objects include the `Teamwork` and `Jira Teamwork` dashboards with their related Lens visualizations/index patterns.
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
+- Jira issue and event syncs persist crash-recovery checkpoints in `.jstats-state.json`; completed runs clear their checkpoints.
 - Ingestion skips pull updates older than `MIN_PULL_UPDATED_AT` (defaults to the start of 2025).
 - Ingestion prints a progress bar while indexing (`indexed/planned` documents).
 - Jira tracking scope is documented in [docs/jira-tracking-plan.md](/Users/jeremy/Repos/experiments/JStats/docs/jira-tracking-plan.md).

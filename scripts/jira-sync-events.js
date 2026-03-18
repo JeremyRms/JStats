@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import dotenv from "dotenv";
-import { createElasticClient } from "../src/elastic-client.js";
+import { bulkIndexDocuments, createElasticClient } from "../src/elastic-client.js";
 import { createJiraClient } from "../src/jira-client.js";
 import {
   buildCreatedEventDocument,
@@ -10,12 +10,19 @@ import {
 } from "../src/jira-event-document.js";
 import { resolveJiraAuthConfig } from "../src/jira-config.js";
 import {
+  buildJiraSyncSignature,
+  clearJiraSyncCheckpoint,
+  getJiraSyncCheckpoint,
+  setJiraSyncCheckpoint,
+} from "../src/jira-sync-state.js";
+import {
   appendJqlClauses,
   isTimestampInWindow,
   resolveJiraSyncWindow,
   sortDocumentsByTimestampDesc,
 } from "../src/jira-sync-window.js";
 import { loadSecretEnvValues } from "../src/secret-env.js";
+import { loadState, saveState } from "../src/state-store.js";
 
 dotenv.config();
 loadSecretEnvValues();
@@ -26,11 +33,17 @@ try {
   const elasticClient = createElasticClient();
   const statusCategoryById = buildStatusCategoryById(await jiraClient.listStatuses());
   const syncWindow = resolveJiraSyncWindow();
+  const stateFilePath = process.env.STATE_FILE || "./.jstats-state.json";
+  const state = loadState(stateFilePath);
+  const resumeEnabled = parseBooleanFlag(process.env.JIRA_SYNC_RESUME, true);
   const maxIssues = parsePositiveInteger(
     process.env.JIRA_EVENT_SYNC_MAX_ISSUES,
     20
   );
-  const pageSize = Math.min(maxIssues, 50);
+  const pageSize = Math.min(
+    maxIssues,
+    parsePositiveInteger(process.env.JIRA_SYNC_PAGE_SIZE, 100)
+  );
   const fields = ["summary", "project", "created", "creator"].join(",");
 
   let startAt = 0;
@@ -41,6 +54,23 @@ try {
     syncWindow?.updatedJql
   );
   const searchJql = baseJql ? `${baseJql} ORDER BY updated DESC` : "ORDER BY updated DESC";
+  const signature = buildJiraSyncSignature({
+    organization: process.env.ORGANIZATION,
+    baseUrl: jiraConfig.baseUrl,
+    searchJql,
+    projectKeys: jiraConfig.projectKeys,
+    syncYear: syncWindow?.year,
+  });
+  const checkpoint = resumeEnabled
+    ? getJiraSyncCheckpoint(state, "events", signature)
+    : null;
+
+  if (checkpoint) {
+    startAt = checkpoint.next_start_at || 0;
+    syncedIssues = checkpoint.synced_issues || 0;
+    indexedEvents = checkpoint.indexed_events || 0;
+    console.info(`Resuming Jira event sync from offset ${startAt}`);
+  }
 
   while (syncedIssues < maxIssues) {
     const page = await jiraClient.searchIssues({
@@ -55,7 +85,7 @@ try {
       break;
     }
 
-    for (const issue of issues) {
+    for (const [issueIndex, issue] of issues.entries()) {
       const eventDocuments = [];
       const createdDoc = buildCreatedEventDocument(issue, {
         baseUrl: jiraConfig.baseUrl,
@@ -78,16 +108,18 @@ try {
         );
       }
 
-      for (const doc of sortDocumentsByTimestampDesc(eventDocuments)) {
-        await elasticClient.index({
-          index: "jstats-jira-event",
-          id: doc.id,
-          body: doc,
-        });
-        indexedEvents += 1;
-      }
+      const sortedDocuments = sortDocumentsByTimestampDesc(eventDocuments);
+      await bulkIndexDocuments(elasticClient, "jstats-jira-event", sortedDocuments);
+      indexedEvents += sortedDocuments.length;
 
       syncedIssues += 1;
+      setJiraSyncCheckpoint(state, "events", signature, {
+        next_start_at: startAt + issueIndex + 1,
+        synced_issues: syncedIssues,
+        indexed_events: indexedEvents,
+        page_size: pageSize,
+      });
+      saveState(stateFilePath, state);
       console.info(
         `Indexed Jira events for ${issue.key} (${syncedIssues}/${maxIssues} issues, ${indexedEvents} events)`
       );
@@ -99,6 +131,8 @@ try {
     }
   }
 
+  clearJiraSyncCheckpoint(state, "events");
+  saveState(stateFilePath, state);
   if (syncWindow) {
     console.info(
       `Event sync window: ${syncWindow.start} to ${syncWindow.end} (updated desc, events filtered by timestamp)`
@@ -138,4 +172,20 @@ function parsePositiveInteger(value, fallback) {
   }
 
   return fallback;
+}
+
+function parseBooleanFlag(value, fallback) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "n", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Invalid boolean flag: ${value}`);
 }

@@ -17,6 +17,7 @@ test("loadState returns defaults when file does not exist", () => {
 
   assert.equal(state.version, 1);
   assert.deepEqual(state.repos, {});
+  assert.deepEqual(state.jira_sync, {});
 });
 
 test("set/get repo watermark and save/load roundtrip", () => {

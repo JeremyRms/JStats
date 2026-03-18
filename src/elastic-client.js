@@ -23,3 +23,30 @@ export function createElasticClient(env = process.env) {
   });
 }
 
+export async function bulkIndexDocuments(client, index, documents = []) {
+  if (!documents.length) {
+    return 0;
+  }
+
+  const body = [];
+  for (const document of documents) {
+    body.push({ index: { _index: index, _id: document.id } });
+    body.push(document);
+  }
+
+  const response = await client.bulk({
+    refresh: false,
+    body,
+  });
+  const result = response.body || response;
+  if (result.errors) {
+    const firstError = result.items?.find((item) => item.index?.error)?.index?.error;
+    throw new Error(
+      `Elasticsearch bulk index failed for ${index}: ${
+        firstError?.reason || "unknown bulk error"
+      }`
+    );
+  }
+
+  return documents.length;
+}
