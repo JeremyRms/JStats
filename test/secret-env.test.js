@@ -15,7 +15,7 @@ test("loadSecretEnvValues prefers secret files over env values", () => {
 
   const env = {
     API_KEY: "github-from-env",
-    API_KEY_FILE: githubSecretPath,
+    GITHUB_API_KEY_FILE: githubSecretPath,
     JIRA_API_TOKEN: "jira-from-env",
     JIRA_API_TOKEN_FILE: jiraSecretPath,
   };
@@ -29,7 +29,7 @@ test("loadSecretEnvValues prefers secret files over env values", () => {
 test("loadSecretEnvValues falls back to env when secret files are absent", () => {
   const env = {
     API_KEY: "github-from-env",
-    API_KEY_FILE: "/tmp/jstats-missing-github-secret",
+    GITHUB_API_KEY_FILE: "/tmp/jstats-missing-github-secret",
     JIRA_API_TOKEN: "jira-from-env",
     JIRA_API_TOKEN_FILE: "/tmp/jstats-missing-jira-secret",
   };
@@ -39,4 +39,3 @@ test("loadSecretEnvValues falls back to env when secret files are absent", () =>
   assert.equal(env.API_KEY, "github-from-env");
   assert.equal(env.JIRA_API_TOKEN, "jira-from-env");
 });
-

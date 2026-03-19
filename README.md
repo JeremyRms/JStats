@@ -51,7 +51,7 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `JIRA_JQL`
 - `JIRA_PROJECT_KEYS` (comma-separated Jira project keys to track)
 - `TEAM_DIRECTORY_FILE` (default `config/team-directory.json`)
-- `API_KEY_FILE` (default `~/.jstats/github_api_key`)
+- `GITHUB_API_KEY_FILE` (default `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
 - `GITHUB_API_KEY_HOST_PATH` (host path mounted into `jstats.yml`, default local `.env` value `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_HOST_PATH` (host path mounted into `jstats.yml`, default local `.env` value `~/.jira/api_token`)
@@ -79,7 +79,7 @@ If a secret file exists, it overrides the value from `.env`. If it does not exis
 When running via `jstats.yml`, Docker mounts the host secret files read-only and passes these container paths:
 
 ```bash
-API_KEY_FILE=/run/secrets/github_api_key
+GITHUB_API_KEY_FILE=/run/secrets/github_api_key
 JIRA_API_TOKEN_FILE=/run/secrets/jira_api_token
 ```
 

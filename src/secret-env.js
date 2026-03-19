@@ -9,7 +9,10 @@ const DEFAULT_SECRET_FILES = {
 
 export function loadSecretEnvValues(env = process.env) {
   for (const [name, defaultPath] of Object.entries(DEFAULT_SECRET_FILES)) {
-    const filePath = env[`${name}_FILE`] || defaultPath;
+    const filePath =
+      name === "API_KEY"
+        ? env.GITHUB_API_KEY_FILE || defaultPath
+        : env[`${name}_FILE`] || defaultPath;
     const secret = readSecretFile(filePath);
     if (secret) {
       env[name] = secret;
