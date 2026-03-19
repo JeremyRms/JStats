@@ -24,6 +24,8 @@ if [ ! -f ".env" ]; then
         echo 'JIRA_EMAIL='
         echo 'JIRA_JQL='
         echo 'JIRA_PROJECT_KEYS='
+        echo "GITHUB_API_KEY_HOST_PATH=$HOME/.jstats/github_api_key"
+        echo "JIRA_API_TOKEN_HOST_PATH=$HOME/.jira/api_token"
         echo 'ELASTIC_PASSWORD=ELASTICUSERPASSWORD'
     } > .env
 

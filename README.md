@@ -53,6 +53,8 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `TEAM_DIRECTORY_FILE` (default `config/team-directory.json`)
 - `API_KEY_FILE` (default `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
+- `GITHUB_API_KEY_HOST_PATH` (host path mounted into `jstats.yml`, default local `.env` value `~/.jstats/github_api_key`)
+- `JIRA_API_TOKEN_HOST_PATH` (host path mounted into `jstats.yml`, default local `.env` value `~/.jira/api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
 - `MIN_PULL_UPDATED_AT` (default `2025-01-01T00:00:00Z`)
 - `PR_CONCURRENCY` (default `4`)
@@ -73,6 +75,22 @@ chmod 600 ~/.jstats/github_api_key ~/.jira/api_token
 ```
 
 If a secret file exists, it overrides the value from `.env`. If it does not exist, the `.env` value is used.
+
+When running via `jstats.yml`, Docker mounts the host secret files read-only and passes these container paths:
+
+```bash
+API_KEY_FILE=/run/secrets/github_api_key
+JIRA_API_TOKEN_FILE=/run/secrets/jira_api_token
+```
+
+The host-side source paths are controlled by:
+
+```bash
+GITHUB_API_KEY_HOST_PATH=~/.jstats/github_api_key
+JIRA_API_TOKEN_HOST_PATH=~/.jira/api_token
+```
+
+If either host path is unset, `jstats.yml` falls back to mounting `/dev/null`, so the app will then fall back to `.env` values instead of crashing on a missing bind source.
 
 ## Jira auth check
 Verify Jira credentials and print the authenticated Jira user:
