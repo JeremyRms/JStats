@@ -18,6 +18,7 @@ export function buildJiraIssueDocument(issue, context = {}) {
     assignee: simplifyUser(fields.assignee),
     reporter: simplifyUser(fields.reporter),
     creator: simplifyUser(fields.creator),
+    story_points: simplifyStoryPoints(fields.customfield_10004),
     labels: fields.labels || [],
     components: (fields.components || []).map((component) => component.name),
     fix_versions: (fields.fixVersions || []).map((version) => version.name),
@@ -93,3 +94,11 @@ function simplifyUser(user) {
   };
 }
 
+function simplifyStoryPoints(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}

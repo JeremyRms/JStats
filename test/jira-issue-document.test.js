@@ -62,6 +62,7 @@ test("buildJiraIssueDocument normalizes Jira issue fields", () => {
           active: true,
           accountType: "atlassian",
         },
+        customfield_10004: 8,
         labels: ["backend"],
         components: [{ name: "API" }],
         fixVersions: [{ name: "2026.03" }],
@@ -116,7 +117,7 @@ test("buildJiraIssueDocument normalizes Jira issue fields", () => {
   assert.deepEqual(doc.labels, ["backend"]);
   assert.deepEqual(doc.components, ["API"]);
   assert.deepEqual(doc.fix_versions, ["2026.03"]);
+  assert.equal(doc.story_points, 8);
   assert.equal(doc.comment_count, 2);
   assert.ok(Number.isFinite(Date.parse(doc.ingested_at)));
 });
-

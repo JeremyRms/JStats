@@ -53,6 +53,7 @@ try {
     "components",
     "fixVersions",
     "parent",
+    "customfield_10004",
   ].join(",");
 
   let nextPageToken;
