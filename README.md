@@ -6,6 +6,7 @@ JStats ingests GitHub organization data and stores it in Elasticsearch for Kiban
 - Ingestion service: `app.js`
 - Local Elastic/Kibana Docker setup: `elastic-docker-tls.yml`, `create-certs.yml`, `jstats.yml`
 - Bootstrap helper: `bootstrap.sh`
+- Shared team/member directory: `config/team-directory.json`
 - Versioned Kibana saved objects:
   - `dashboards/teamwork.ndjson`
   - `dashboards/jira-teamwork.ndjson`
@@ -49,6 +50,7 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `JIRA_EMAIL`
 - `JIRA_JQL`
 - `JIRA_PROJECT_KEYS` (comma-separated Jira project keys to track)
+- `TEAM_DIRECTORY_FILE` (default `config/team-directory.json`)
 - `API_KEY_FILE` (default `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
@@ -77,6 +79,72 @@ Verify Jira credentials and print the authenticated Jira user:
 
 ```bash
 npm run jira:auth-check
+```
+
+## Shared team/member directory
+Canonical team and user mapping lives in `config/team-directory.json`.
+
+It is the shared source for:
+
+- team membership
+- GitHub login to person mapping
+- Jira account to person mapping
+- Jira project to team mapping
+
+Current tracked teams are:
+
+- `BROK` -> Broker
+- `MAR` -> Marketplace
+
+File shape:
+
+```json
+{
+  "version": 1,
+  "teams": [
+    {
+      "key": "BROK",
+      "name": "Broker",
+      "jira_project_key": "BROK",
+      "active": true
+    }
+  ],
+  "members": [
+    {
+      "key": "example-person",
+      "team_key": "BROK",
+      "full_name": "Example Person",
+      "nickname": "Example",
+      "github_login": "example-gh",
+      "jira_account_id": "jira-account-id",
+      "jira_display_name": "Example Person",
+      "active": true
+    }
+  ]
+}
+```
+
+Notes:
+
+- `jira_account_id` should be treated as the canonical Jira identity in Jira Cloud.
+- `jira_display_name` is useful for dashboards, but it is not a stable key.
+- The sync validates duplicate `github_login`, duplicate `jira_account_id`, and unknown `team_key`.
+
+To publish the directory into Elasticsearch:
+
+```bash
+npm run team-directory:sync
+```
+
+This replaces the contents of these dedicated indices:
+
+- `jstats-directory-team`
+- `jstats-directory-member`
+
+If your host cannot resolve the Docker-only Elasticsearch hostname from `.env`, override it:
+
+```bash
+ELASTIC_ENDPOINT=https://localhost ELASTIC_PORT=9200 npm run team-directory:sync
 ```
 
 ## GitHub archived repository cleanup

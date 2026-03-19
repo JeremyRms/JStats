@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "teams": [
+    {
+      "key": "BROK",
+      "name": "Broker",
+      "jira_project_key": "BROK",
+      "active": true
+    },
+    {
+      "key": "MAR",
+      "name": "Marketplace",
+      "jira_project_key": "MAR",
+      "active": true
+    }
+  ],
+  "members": []
+}
