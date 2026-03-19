@@ -40,6 +40,10 @@ try {
     process.env.JIRA_EVENT_SYNC_MAX_ISSUES,
     20
   );
+  const eventConcurrency = parsePositiveInteger(
+    process.env.JIRA_EVENT_SYNC_CONCURRENCY,
+    4
+  );
   const pageSize = Math.min(
     maxIssues,
     parsePositiveInteger(process.env.JIRA_SYNC_PAGE_SIZE, 100)
@@ -47,7 +51,6 @@ try {
   const fields = ["summary", "project", "created", "creator"].join(",");
 
   let nextPageToken;
-  let pageIssueOffset = 0;
   let syncedIssues = 0;
   let indexedEvents = 0;
   const baseJql = appendJqlClauses(
@@ -69,11 +72,10 @@ try {
 
   if (checkpoint) {
     nextPageToken = checkpoint.next_page_token || undefined;
-    pageIssueOffset = checkpoint.page_issue_offset || 0;
     syncedIssues = checkpoint.synced_issues || 0;
     indexedEvents = checkpoint.indexed_events || 0;
     console.info(
-      `Resuming Jira event sync from page token ${nextPageToken ? "present" : "start"} at page offset ${pageIssueOffset}`
+      `Resuming Jira event sync from page token ${nextPageToken ? "present" : "start"}`
     );
   }
 
@@ -85,21 +87,20 @@ try {
       nextPageToken,
     });
 
-    const pageIssues = page.issues || [];
-    const issues = pageIssueOffset > 0 ? pageIssues.slice(pageIssueOffset) : pageIssues;
+    const issues = page.issues || [];
     if (issues.length === 0) {
-      if (pageIssues.length > 0 && pageIssueOffset > 0) {
-        nextPageToken = page.nextPageToken || undefined;
-        pageIssueOffset = 0;
-        if (!nextPageToken) {
-          break;
-        }
-        continue;
-      }
       break;
     }
 
-    for (const [issueIndex, issue] of issues.entries()) {
+    console.info(
+      `Processing Jira event page (${issues.length} issues, synced ${syncedIssues}/${maxIssues}, concurrency=${eventConcurrency}, newest=${issues[0]?.key}, oldest=${issues[issues.length - 1]?.key})`
+    );
+
+    let completedIssuesInPage = 0;
+    const pageDocumentsByIssue = await mapWithConcurrency(
+      issues,
+      eventConcurrency,
+      async (issue) => {
       const eventDocuments = [];
       const createdDoc = buildCreatedEventDocument(issue, {
         baseUrl: jiraConfig.baseUrl,
@@ -122,34 +123,36 @@ try {
         );
       }
 
-      const sortedDocuments = sortDocumentsByTimestampDesc(eventDocuments);
-      await bulkIndexDocuments(elasticClient, "jstats-jira-event", sortedDocuments);
-      indexedEvents += sortedDocuments.length;
+        const sortedDocuments = sortDocumentsByTimestampDesc(eventDocuments);
+        completedIssuesInPage += 1;
+        if (
+          completedIssuesInPage % 10 === 0 ||
+          completedIssuesInPage === issues.length
+        ) {
+          console.info(
+            `Fetched changelogs for ${completedIssuesInPage}/${issues.length} issues in current page`
+          );
+        }
+        return sortedDocuments;
+      }
+    );
 
-      syncedIssues += 1;
-      setJiraSyncCheckpoint(state, "events", signature, {
-        next_page_token: nextPageToken || null,
-        page_issue_offset: pageIssueOffset + issueIndex + 1,
-        synced_issues: syncedIssues,
-        indexed_events: indexedEvents,
-        page_size: pageSize,
-      });
-      saveState(stateFilePath, state);
-      console.info(
-        `Indexed Jira events for ${issue.key} (${syncedIssues}/${maxIssues} issues, ${indexedEvents} events)`
-      );
-    }
+    const pageDocuments = pageDocumentsByIssue.flat();
 
-    pageIssueOffset = 0;
+    await bulkIndexDocuments(elasticClient, "jstats-jira-event", pageDocuments);
+    syncedIssues += issues.length;
+    indexedEvents += pageDocuments.length;
     nextPageToken = page.nextPageToken || undefined;
     setJiraSyncCheckpoint(state, "events", signature, {
       next_page_token: nextPageToken || null,
-      page_issue_offset: 0,
       synced_issues: syncedIssues,
       indexed_events: indexedEvents,
       page_size: pageSize,
     });
     saveState(stateFilePath, state);
+    console.info(
+      `Indexed Jira event page (${issues.length} issues, ${pageDocuments.length} events, synced ${syncedIssues}/${maxIssues}, newest=${issues[0]?.key}, oldest=${issues[issues.length - 1]?.key})`
+    );
 
     if (page.isLast || !nextPageToken) {
       break;
@@ -213,4 +216,25 @@ function parseBooleanFlag(value, fallback) {
   }
 
   throw new Error(`Invalid boolean flag: ${value}`);
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    for (;;) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
 }

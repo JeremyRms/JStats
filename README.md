@@ -128,6 +128,7 @@ Current event semantics:
 Optional:
 
 - `JIRA_EVENT_SYNC_MAX_ISSUES` (default `20`)
+- `JIRA_EVENT_SYNC_CONCURRENCY` (default `4`)
 - `JIRA_SYNC_PAGE_SIZE` (default `100`)
 - `JIRA_SYNC_YEAR` to restrict candidate issues to those updated in a given year and to index only events whose `event_timestamp` falls within that year
 - `JIRA_SYNC_RESUME` (default `true`) to resume from the last saved Jira sync checkpoint after a crash
