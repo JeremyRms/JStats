@@ -58,11 +58,21 @@ export function buildMemberDocuments(directory) {
       team_key: member.team_key,
       team_name: team?.name || null,
       jira_project_key: team?.jira_project_key || null,
+      source_record_ids: member.source_record_ids,
       full_name: member.full_name,
       nickname: member.nickname,
+      email: member.email,
+      role: member.role,
+      allocation_percent: member.allocation_percent,
       github_login: member.github_login,
       jira_account_id: member.jira_account_id,
       jira_display_name: member.jira_display_name,
+      manager_name: member.manager_name,
+      start_date: member.start_date,
+      location_country: member.location_country,
+      location_city: member.location_city,
+      nationality: member.nationality,
+      image_url: member.image_url,
       active: member.active,
       ingested_at: new Date().toISOString(),
     };
@@ -98,18 +108,19 @@ function normalizeMember(member = {}) {
       member.nickname,
       `member ${member.key || "<unknown>"} nickname`
     ),
-    github_login: requireNonEmptyString(
-      member.github_login,
-      `member ${member.key || "<unknown>"} github_login`
-    ),
-    jira_account_id: requireNonEmptyString(
-      member.jira_account_id,
-      `member ${member.key || "<unknown>"} jira_account_id`
-    ),
-    jira_display_name: requireNonEmptyString(
-      member.jira_display_name,
-      `member ${member.key || "<unknown>"} jira_display_name`
-    ),
+    source_record_ids: normalizeStringArray(member.source_record_ids),
+    email: normalizeOptionalString(member.email),
+    role: normalizeOptionalString(member.role),
+    allocation_percent: normalizeOptionalNumber(member.allocation_percent),
+    github_login: normalizeOptionalString(member.github_login),
+    jira_account_id: normalizeOptionalString(member.jira_account_id),
+    jira_display_name: normalizeOptionalString(member.jira_display_name),
+    manager_name: normalizeOptionalString(member.manager_name),
+    start_date: normalizeOptionalString(member.start_date),
+    location_country: normalizeOptionalString(member.location_country),
+    location_city: normalizeOptionalString(member.location_city),
+    nationality: normalizeOptionalString(member.nationality),
+    image_url: normalizeOptionalString(member.image_url),
     active: normalizeBoolean(member.active, true),
   };
 }
@@ -137,18 +148,22 @@ function validateTeamDirectory(directory, context = {}) {
     if (memberKeys.has(member.key)) {
       throw new Error(`Duplicate member key ${member.key}${source}`);
     }
-    if (githubLogins.has(member.github_login)) {
+    if (member.github_login && githubLogins.has(member.github_login)) {
       throw new Error(`Duplicate github_login ${member.github_login}${source}`);
     }
-    if (jiraAccountIds.has(member.jira_account_id)) {
+    if (member.jira_account_id && jiraAccountIds.has(member.jira_account_id)) {
       throw new Error(
         `Duplicate jira_account_id ${member.jira_account_id}${source}`
       );
     }
 
     memberKeys.add(member.key);
-    githubLogins.add(member.github_login);
-    jiraAccountIds.add(member.jira_account_id);
+    if (member.github_login) {
+      githubLogins.add(member.github_login);
+    }
+    if (member.jira_account_id) {
+      jiraAccountIds.add(member.jira_account_id);
+    }
   }
 }
 
@@ -175,4 +190,23 @@ function normalizeBoolean(value, fallback) {
   }
 
   return Boolean(value);
+}
+
+function normalizeOptionalNumber(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function normalizeStringArray(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values
+    .map((value) => normalizeOptionalString(value))
+    .filter(Boolean);
 }

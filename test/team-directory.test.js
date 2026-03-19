@@ -32,15 +32,14 @@ test("normalizeTeamDirectory validates members against known teams", () => {
         team_key: "BROK",
         full_name: "Jeremy Lamit",
         nickname: "Jeremy",
-        github_login: "jeremyrms",
-        jira_account_id: "jira-123",
-        jira_display_name: "Jeremy Lamit",
       },
     ],
   });
 
   assert.equal(directory.teams[0].active, true);
   assert.equal(directory.members[0].active, true);
+  assert.equal(directory.members[0].github_login, null);
+  assert.equal(directory.members[0].jira_account_id, null);
 });
 
 test("normalizeTeamDirectory rejects duplicate github logins", () => {
@@ -61,8 +60,6 @@ test("normalizeTeamDirectory rejects duplicate github logins", () => {
             full_name: "Member One",
             nickname: "One",
             github_login: "shared-login",
-            jira_account_id: "jira-1",
-            jira_display_name: "Member One",
           },
           {
             key: "member-two",
@@ -70,8 +67,6 @@ test("normalizeTeamDirectory rejects duplicate github logins", () => {
             full_name: "Member Two",
             nickname: "Two",
             github_login: "shared-login",
-            jira_account_id: "jira-2",
-            jira_display_name: "Member Two",
           },
         ],
       }),
@@ -94,9 +89,9 @@ test("buildTeamDocuments and buildMemberDocuments flatten shared fields", () => 
         team_key: "MAR",
         full_name: "Member One",
         nickname: "One",
-        github_login: "member-one",
-        jira_account_id: "jira-1",
-        jira_display_name: "Member One",
+        email: "member-one@example.com",
+        role: "Engineer",
+        allocation_percent: 100,
       },
     ],
   });
@@ -109,6 +104,9 @@ test("buildTeamDocuments and buildMemberDocuments flatten shared fields", () => 
   assert.equal(members[0].id, "member:member-one");
   assert.equal(members[0].team_name, "Marketplace");
   assert.equal(members[0].jira_project_key, "MAR");
+  assert.equal(members[0].email, "member-one@example.com");
+  assert.equal(members[0].role, "Engineer");
+  assert.equal(members[0].allocation_percent, 100);
 });
 
 test("loadTeamDirectory reads the json file from disk", () => {
@@ -130,9 +128,7 @@ test("loadTeamDirectory reads the json file from disk", () => {
           team_key: "BROK",
           full_name: "Member One",
           nickname: "One",
-          github_login: "member-one",
-          jira_account_id: "jira-1",
-          jira_display_name: "Member One",
+          email: "member-one@example.com",
         },
       ],
     })
@@ -141,5 +137,12 @@ test("loadTeamDirectory reads the json file from disk", () => {
   const directory = loadTeamDirectory(filePath);
 
   assert.equal(directory.teams[0].key, "BROK");
-  assert.equal(directory.members[0].jira_account_id, "jira-1");
+  assert.equal(directory.members[0].email, "member-one@example.com");
+});
+
+test("the tracked team directory file is valid and loadable", () => {
+  const directory = loadTeamDirectory("config/team-directory.json");
+
+  assert.equal(directory.teams.length, 2);
+  assert.ok(directory.members.length >= 1);
 });

@@ -113,11 +113,23 @@ File shape:
     {
       "key": "example-person",
       "team_key": "BROK",
+      "source_record_ids": [
+        "123"
+      ],
       "full_name": "Example Person",
       "nickname": "Example",
-      "github_login": "example-gh",
-      "jira_account_id": "jira-account-id",
-      "jira_display_name": "Example Person",
+      "email": "example.person@company.test",
+      "role": "Engineer",
+      "allocation_percent": 100,
+      "github_login": null,
+      "jira_account_id": null,
+      "jira_display_name": null,
+      "manager_name": "Manager Name",
+      "start_date": "2026-01-01",
+      "location_country": "Thailand",
+      "location_city": "Bangkok",
+      "nationality": "Thai",
+      "image_url": "https://example.test/avatar.jpg",
       "active": true
     }
   ]
@@ -128,6 +140,8 @@ Notes:
 
 - `jira_account_id` should be treated as the canonical Jira identity in Jira Cloud.
 - `jira_display_name` is useful for dashboards, but it is not a stable key.
+- `github_login`, `jira_account_id`, and `jira_display_name` can be left empty in the first pass when they have not been mapped yet.
+- `source_record_ids` keeps traceability back to the source roster rows when duplicate people need to be merged.
 - The sync validates duplicate `github_login`, duplicate `jira_account_id`, and unknown `team_key`.
 
 To publish the directory into Elasticsearch:
