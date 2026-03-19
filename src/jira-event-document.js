@@ -75,6 +75,7 @@ export function buildHistoryEventDocuments(issue, history, statusCategoryById, c
       status_from: completedStatusItem.fromString || null,
       status_to: completedStatusItem.toString || null,
       status_to_category_key: statusCategoryById.get(String(completedStatusItem.to)) || null,
+      assignee_at_completion: simplifyUser(context.assigneeAtCompletion),
     });
   }
 

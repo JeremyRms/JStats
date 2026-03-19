@@ -119,17 +119,26 @@ try {
       }
 
       const histories = await getAllChangelogEntries(jiraClient, issue.key);
+      let assigneeAtHistory = cloneUser(issue.fields?.assignee);
       for (const history of histories) {
+        const nextAssignee = resolveAssigneeAfterHistory(
+          assigneeAtHistory,
+          history
+        );
         const docs = buildHistoryEventDocuments(
           issue,
           history,
           statusCategoryById,
-          { baseUrl: jiraConfig.baseUrl }
+          {
+            baseUrl: jiraConfig.baseUrl,
+            assigneeAtCompletion: nextAssignee,
+          }
         );
 
         eventDocuments.push(
           ...docs.filter((doc) => isTimestampInWindow(doc.event_timestamp, syncWindow))
         );
+        assigneeAtHistory = nextAssignee;
       }
 
         const sortedDocuments = sortDocumentsByTimestampDesc(eventDocuments);
@@ -246,4 +255,39 @@ async function mapWithConcurrency(items, concurrency, mapper) {
   const workerCount = Math.max(1, Math.min(concurrency, items.length));
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return results;
+}
+
+function resolveAssigneeAfterHistory(currentAssignee, history) {
+  const nextAssignee = cloneUser(currentAssignee);
+  for (const item of history.items || []) {
+    if (item.field !== "assignee") {
+      continue;
+    }
+
+    if (!item.to && !item.toAccountId && !item.toString) {
+      return null;
+    }
+
+    return {
+      accountId: item.toAccountId || item.to || nextAssignee?.accountId || null,
+      displayName: item.toString || nextAssignee?.displayName || null,
+      active: nextAssignee?.active ?? null,
+      accountType: nextAssignee?.accountType || null,
+    };
+  }
+
+  return nextAssignee;
+}
+
+function cloneUser(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    accountId: user.accountId || null,
+    displayName: user.displayName || null,
+    active: user.active ?? null,
+    accountType: user.accountType || null,
+  };
 }

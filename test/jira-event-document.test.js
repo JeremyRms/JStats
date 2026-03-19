@@ -98,7 +98,15 @@ test("buildHistoryEventDocuments emits updated and completed events separately",
       ],
     },
     new Map([["10001", "done"]]),
-    { baseUrl: "https://example.atlassian.net" }
+    {
+      baseUrl: "https://example.atlassian.net",
+      assigneeAtCompletion: {
+        accountId: "def",
+        displayName: "Bob",
+        active: true,
+        accountType: "atlassian",
+      },
+    }
   );
 
   assert.equal(docs.length, 2);
@@ -106,4 +114,10 @@ test("buildHistoryEventDocuments emits updated and completed events separately",
   assert.equal(docs[1].event_type, "completed");
   assert.equal(docs[1].status_to, "Done");
   assert.equal(docs[1].status_to_category_key, "done");
+  assert.deepEqual(docs[1].assignee_at_completion, {
+    account_id: "def",
+    display_name: "Bob",
+    active: true,
+    account_type: "atlassian",
+  });
 });
