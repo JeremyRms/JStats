@@ -76,6 +76,15 @@ try {
     ? getJiraSyncCheckpoint(state, "issues", signature)
     : null;
 
+  console.info(
+    `Jira issue sync config: max_results=${maxResults}, page_size=${pageSize}, resume=${resumeEnabled}, year=${syncWindow?.year || "all"}`
+  );
+  if (!process.env.JIRA_ISSUE_SYNC_MAX_RESULTS) {
+    console.info(
+      "Jira issue sync is using the default max_results=100; set JIRA_ISSUE_SYNC_MAX_RESULTS for larger backfills."
+    );
+  }
+
   if (checkpoint) {
     nextPageToken = checkpoint.next_page_token || undefined;
     pageIssueOffset = checkpoint.page_issue_offset || 0;

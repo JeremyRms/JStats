@@ -70,6 +70,15 @@ try {
     ? getJiraSyncCheckpoint(state, "events", signature)
     : null;
 
+  console.info(
+    `Jira event sync config: max_issues=${maxIssues}, page_size=${pageSize}, concurrency=${eventConcurrency}, resume=${resumeEnabled}, year=${syncWindow?.year || "all"}`
+  );
+  if (!process.env.JIRA_EVENT_SYNC_MAX_ISSUES) {
+    console.info(
+      "Jira event sync is using the default max_issues=20; set JIRA_EVENT_SYNC_MAX_ISSUES for larger backfills."
+    );
+  }
+
   if (checkpoint) {
     nextPageToken = checkpoint.next_page_token || undefined;
     syncedIssues = checkpoint.synced_issues || 0;
