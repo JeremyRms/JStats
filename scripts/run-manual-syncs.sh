@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -15,6 +15,11 @@ warn() {
   printf 'Warning: %s\n' "$*" >&2
 }
 
+die() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
 read_env_value() {
   local key="$1"
   [[ -f "$ENV_FILE" ]] || return 1
@@ -26,14 +31,14 @@ read_env_value() {
 
 ELASTIC_PASSWORD="$(read_env_value ELASTIC_PASSWORD || true)"
 if [[ -z "$ELASTIC_PASSWORD" ]]; then
-  warn "Environment file $ENV_FILE either missing or ELASTIC_PASSWORD unset; commands that need it will likely fail."
+  die "Environment file $ENV_FILE is missing or ELASTIC_PASSWORD is unset."
 else
   export ELASTIC_PASSWORD
 fi
 
 KIBANA_PASSWORD="$(read_env_value KIBANA_PASSWORD || true)"
 if [[ -z "$KIBANA_PASSWORD" ]]; then
-  warn "KIBANA_PASSWORD not found in $ENV_FILE; Kibana imports will fail until it is provided."
+  die "KIBANA_PASSWORD not found in $ENV_FILE."
 else
   export KIBANA_PASSWORD
 fi
@@ -42,16 +47,22 @@ GITHUB_API_KEY_FILE="${GITHUB_API_KEY_FILE:-$HOME/.jstats/github_api_key}"
 if [[ -f "$GITHUB_API_KEY_FILE" ]]; then
   GITHUB_API_KEY="$(< "$GITHUB_API_KEY_FILE")"
 else
-  warn "GitHub API key file $GITHUB_API_KEY_FILE not found; GitHub sync will run without it."
-  GITHUB_API_KEY=""
+  die "GitHub API key file $GITHUB_API_KEY_FILE not found."
+fi
+
+if [[ -z "$GITHUB_API_KEY" ]]; then
+  die "GitHub API key file $GITHUB_API_KEY_FILE is empty."
 fi
 
 JIRA_API_TOKEN_FILE="${JIRA_API_TOKEN_FILE:-$HOME/.jira/api_token}"
 if [[ -f "$JIRA_API_TOKEN_FILE" ]]; then
   JIRA_API_TOKEN="$(< "$JIRA_API_TOKEN_FILE")"
 else
-  warn "Jira API token file $JIRA_API_TOKEN_FILE not found; Jira syncs will run without it."
-  JIRA_API_TOKEN=""
+  die "Jira API token file $JIRA_API_TOKEN_FILE not found."
+fi
+
+if [[ -z "$JIRA_API_TOKEN" ]]; then
+  die "Jira API token file $JIRA_API_TOKEN_FILE is empty."
 fi
 
 run_step() {
