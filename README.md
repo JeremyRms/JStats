@@ -10,6 +10,7 @@ JStats ingests GitHub organization data and stores it in Elasticsearch for Kiban
 - Versioned Kibana saved objects:
   - `dashboards/teamwork.ndjson`
   - `dashboards/jira-teamwork.ndjson`
+  - `dashboards/team-directory.ndjson`
 
 ## Local startup
 Run:
@@ -38,6 +39,11 @@ KIBANA_PASSWORD='<elastic-password>' \
 ```bash
 KIBANA_PASSWORD='<elastic-password>' \
 ./scripts/kibana-saved-objects.sh import dashboards/jira-teamwork.ndjson
+```
+
+```bash
+KIBANA_PASSWORD='<elastic-password>' \
+./scripts/kibana-saved-objects.sh import dashboards/team-directory.ndjson
 ```
 
 ### Optional environment variables
@@ -248,6 +254,7 @@ JIRA_PROJECT_KEYS=
 
 ## Notes
 - Saved objects include the `Teamwork` and `Jira Teamwork` dashboards with their related Lens visualizations/index patterns.
+- Saved objects also include the `Team Directory` dashboard backed by `jstats-directory-member*`.
 - Ingestion persists a local pull `updated_at` watermark per repository in `.jstats-state.json` to avoid reprocessing unchanged pull requests on subsequent runs.
 - Jira issue and event syncs persist crash-recovery checkpoints in `.jstats-state.json`; completed runs clear their checkpoints.
 - Jira search pagination uses Jira `nextPageToken` cursors, not numeric offsets.
