@@ -100,6 +100,7 @@ test("buildHistoryEventDocuments emits updated and completed events separately",
     new Map([["10001", "done"]]),
     {
       baseUrl: "https://example.atlassian.net",
+      storyPoints: 5,
       assigneeAtCompletion: {
         accountId: "def",
         displayName: "Bob",
@@ -114,6 +115,7 @@ test("buildHistoryEventDocuments emits updated and completed events separately",
   assert.equal(docs[1].event_type, "completed");
   assert.equal(docs[1].status_to, "Done");
   assert.equal(docs[1].status_to_category_key, "done");
+  assert.equal(docs[1].story_points, 5);
   assert.deepEqual(docs[1].assignee_at_completion, {
     account_id: "def",
     display_name: "Bob",

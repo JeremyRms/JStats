@@ -48,7 +48,14 @@ try {
     maxIssues,
     parsePositiveInteger(process.env.JIRA_SYNC_PAGE_SIZE, 100)
   );
-  const fields = ["summary", "project", "created", "creator"].join(",");
+  const fields = [
+    "summary",
+    "project",
+    "created",
+    "creator",
+    "assignee",
+    "customfield_10004",
+  ].join(",");
 
   let nextPageToken;
   let syncedIssues = 0;
@@ -131,6 +138,7 @@ try {
           statusCategoryById,
           {
             baseUrl: jiraConfig.baseUrl,
+            storyPoints: issue.fields?.customfield_10004,
             assigneeAtCompletion: nextAssignee,
           }
         );

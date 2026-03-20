@@ -75,6 +75,7 @@ export function buildHistoryEventDocuments(issue, history, statusCategoryById, c
       status_from: completedStatusItem.fromString || null,
       status_to: completedStatusItem.toString || null,
       status_to_category_key: statusCategoryById.get(String(completedStatusItem.to)) || null,
+      story_points: simplifyStoryPoints(context.storyPoints),
       assignee_at_completion: simplifyUser(context.assigneeAtCompletion),
     });
   }
@@ -120,4 +121,13 @@ function simplifyUser(user) {
     active: user.active,
     account_type: user.accountType,
   };
+}
+
+function simplifyStoryPoints(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
 }
