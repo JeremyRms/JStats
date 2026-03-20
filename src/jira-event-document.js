@@ -9,6 +9,7 @@ export function buildCreatedEventDocument(issue, context = {}) {
     issue_id: issue.id,
     issue_key: issue.key,
     issue_summary: issue.fields?.summary || null,
+    issue_type: simplifyIssueType(issue.fields?.issuetype),
     project_key: issue.fields?.project?.key || null,
     project_name: issue.fields?.project?.name || null,
     actor: simplifyUser(issue.fields?.creator),
@@ -48,6 +49,7 @@ export function buildHistoryEventDocuments(issue, history, statusCategoryById, c
       issue_id: issue.id,
       issue_key: issue.key,
       issue_summary: issue.fields?.summary || null,
+      issue_type: simplifyIssueType(issue.fields?.issuetype),
       project_key: issue.fields?.project?.key || null,
       project_name: issue.fields?.project?.name || null,
       actor: simplifyUser(history.author),
@@ -67,6 +69,7 @@ export function buildHistoryEventDocuments(issue, history, statusCategoryById, c
       issue_id: issue.id,
       issue_key: issue.key,
       issue_summary: issue.fields?.summary || null,
+      issue_type: simplifyIssueType(issue.fields?.issuetype),
       project_key: issue.fields?.project?.key || null,
       project_name: issue.fields?.project?.name || null,
       actor: simplifyUser(history.author),
@@ -120,6 +123,19 @@ function simplifyUser(user) {
     display_name: user.displayName,
     active: user.active,
     account_type: user.accountType,
+  };
+}
+
+function simplifyIssueType(issueType) {
+  if (!issueType) {
+    return null;
+  }
+
+  return {
+    id: issueType.id,
+    name: issueType.name,
+    subtask: issueType.subtask,
+    hierarchy_level: issueType.hierarchyLevel,
   };
 }
 

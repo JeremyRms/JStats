@@ -15,6 +15,12 @@ test("buildCreatedEventDocument creates a created event", () => {
       fields: {
         created: "2026-03-17T10:00:00.000+0700",
         summary: "Example issue",
+        issuetype: {
+          id: "10001",
+          name: "Story",
+          subtask: false,
+          hierarchyLevel: 0,
+        },
         project: {
           key: "ENG",
           name: "Engineering",
@@ -34,6 +40,7 @@ test("buildCreatedEventDocument creates a created event", () => {
   assert.equal(doc.event_type, "created");
   assert.equal(doc.issue_key, "ENG-1");
   assert.equal(doc.project_key, "ENG");
+  assert.equal(doc.issue_type.name, "Story");
   assert.equal(doc.actor.display_name, "Alice");
 });
 
@@ -68,6 +75,12 @@ test("buildHistoryEventDocuments emits updated and completed events separately",
       key: "ENG-1",
       fields: {
         summary: "Example issue",
+        issuetype: {
+          id: "10001",
+          name: "Story",
+          subtask: false,
+          hierarchyLevel: 0,
+        },
         project: {
           key: "ENG",
           name: "Engineering",
@@ -113,6 +126,7 @@ test("buildHistoryEventDocuments emits updated and completed events separately",
   assert.equal(docs.length, 2);
   assert.equal(docs[0].event_type, "updated");
   assert.equal(docs[1].event_type, "completed");
+  assert.equal(docs[1].issue_type.name, "Story");
   assert.equal(docs[1].status_to, "Done");
   assert.equal(docs[1].status_to_category_key, "done");
   assert.equal(docs[1].story_points, 5);
