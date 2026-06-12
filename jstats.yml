@@ -3,9 +3,10 @@ version: '2.2'
 services:
   jstats:
     image: node:20
-    container_name: jstats
+    container_name: ${JSTATS_CONTAINER_NAME:-jstats}
     environment:
-      GITHUB_API_KEY_FILE: ${GITHUB_API_KEY_FILE:-/run/secrets/github_api_key}
+      API_KEY: ${API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       JIRA_API_TOKEN_FILE: ${JIRA_API_TOKEN_FILE:-/run/secrets/jira_api_token}
     command: >
       bash -c '
@@ -17,7 +18,6 @@ services:
     volumes:
       - certs:/certs
       - '.:/app'
-      - "${GITHUB_API_KEY_HOST_PATH:-/dev/null}:${GITHUB_API_KEY_FILE:-/run/secrets/github_api_key}:ro"
       - "${JIRA_API_TOKEN_HOST_PATH:-/dev/null}:${JIRA_API_TOKEN_FILE:-/run/secrets/jira_api_token}:ro"
     networks:
       - elastic

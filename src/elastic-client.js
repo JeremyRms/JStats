@@ -1,16 +1,14 @@
-import elastic from "@elastic/elasticsearch";
+import { Client } from "@elastic/elasticsearch";
 import * as fs from "fs";
-
-const { Client } = elastic;
 
 export function createElasticClient(env = process.env) {
   const caPath = env.ELASTIC_CA_CERT_PATH || "/certs/ca/ca.crt";
-  const ssl = {
+  const tls = {
     rejectUnauthorized: false,
   };
 
   if (fs.existsSync(caPath)) {
-    ssl.ca = fs.readFileSync(caPath);
+    tls.ca = fs.readFileSync(caPath);
   }
 
   return new Client({
@@ -19,7 +17,7 @@ export function createElasticClient(env = process.env) {
       username: "elastic",
       password: `${env.ELASTIC_PASSWORD}`,
     },
-    ssl,
+    tls,
   });
 }
 
@@ -28,15 +26,15 @@ export async function bulkIndexDocuments(client, index, documents = []) {
     return 0;
   }
 
-  const body = [];
+  const operations = [];
   for (const document of documents) {
-    body.push({ index: { _index: index, _id: document.id } });
-    body.push(document);
+    operations.push({ index: { _index: index, _id: document.id } });
+    operations.push(document);
   }
 
   const response = await client.bulk({
     refresh: false,
-    body,
+    operations,
   });
   const result = response.body || response;
   if (result.errors) {

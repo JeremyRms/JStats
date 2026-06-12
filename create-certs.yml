@@ -3,15 +3,32 @@ version: '2.2'
 services:
   create_certs:
     image: docker.elastic.co/elasticsearch/elasticsearch:${VERSION}
-    container_name: create_certs
+    container_name: ${CERTS_CONTAINER_NAME:-create_certs}
+    user: "0"
     command: >
       bash -c '
-        yum install -y -q -e 0 unzip;
+        set -e;
+        if ! command -v unzip >/dev/null 2>&1; then
+          if command -v microdnf >/dev/null 2>&1; then
+            microdnf install -y unzip;
+          elif command -v yum >/dev/null 2>&1; then
+            yum install -y -q -e 0 unzip;
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update && apt-get install -y unzip;
+          else
+            echo "unzip is required to create certificates" >&2;
+            exit 1;
+          fi;
+        fi;
+        if [[ ! -f /certs/ca/ca.crt ]]; then
+          bin/elasticsearch-certutil ca --silent --pem -out /certs/ca.zip;
+          unzip /certs/ca.zip -d /certs;
+        fi;
         if [[ ! -f /certs/bundle.zip ]]; then
-          bin/elasticsearch-certutil cert --silent --pem --in config/certificates/instances.yml -out /certs/bundle.zip;
+          bin/elasticsearch-certutil cert --silent --pem --ca-cert /certs/ca/ca.crt --ca-key /certs/ca/ca.key --in config/certificates/instances.yml -out /certs/bundle.zip;
           unzip /certs/bundle.zip -d /certs; 
         fi;
-        chown -R 1000:0 /certs
+        chown -R 1000:0 /certs || true
       '
     working_dir: /usr/share/elasticsearch
     volumes: 

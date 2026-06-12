@@ -46,10 +46,8 @@ async function replaceIndexDocuments(client, index, documents) {
       index,
       conflicts: "proceed",
       refresh: true,
-      body: {
-        query: {
-          match_all: {},
-        },
+      query: {
+        match_all: {},
       },
     },
     {

@@ -5,15 +5,17 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "start": "node app.js",
     "test": "node --test",
     "jira:auth-check": "node scripts/jira-auth-check.js",
     "github:cleanup-archived-repos": "node scripts/github-clean-archived-repos.js",
     "jira:sync-issues": "node scripts/jira-sync-issues.js",
     "jira:sync-events": "node scripts/jira-sync-events.js",
+    "contributor-summary:sync": "node scripts/contributor-summary-sync.js",
     "team-directory:sync": "node scripts/team-directory-sync.js"
   },
   "dependencies": {
-    "@elastic/elasticsearch": "^7.13.0",
+    "@elastic/elasticsearch": "^8.19.1",
     "@octokit/plugin-throttling": "^3.5.2",
     "dotenv": "^10.0.0",
     "octokit": "^1.0.6"

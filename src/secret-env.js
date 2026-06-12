@@ -3,16 +3,16 @@ import * as os from "os";
 import * as path from "path";
 
 const DEFAULT_SECRET_FILES = {
-  API_KEY: path.join(os.homedir(), ".jstats", "github_api_key"),
   JIRA_API_TOKEN: path.join(os.homedir(), ".jira", "api_token"),
 };
 
 export function loadSecretEnvValues(env = process.env) {
+  if (!env.API_KEY?.trim() && env.GITHUB_TOKEN?.trim()) {
+    env.API_KEY = env.GITHUB_TOKEN.trim();
+  }
+
   for (const [name, defaultPath] of Object.entries(DEFAULT_SECRET_FILES)) {
-    const filePath =
-      name === "API_KEY"
-        ? env.GITHUB_API_KEY_FILE || defaultPath
-        : env[`${name}_FILE`] || defaultPath;
+    const filePath = env[`${name}_FILE`] || defaultPath;
     const secret = readSecretFile(filePath);
     if (secret) {
       env[name] = secret;

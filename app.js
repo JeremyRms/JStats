@@ -1,10 +1,9 @@
 import http from "http";
 import pkg from "octokit";
-import elastic from "@elastic/elasticsearch";
 import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
-import * as fs from "fs";
 import { enrichDocument } from "./src/document-enrichment.js";
+import { createElasticClient } from "./src/elastic-client.js";
 import { loadSecretEnvValues } from "./src/secret-env.js";
 import {
   getRepoPullWatermark,
@@ -80,18 +79,7 @@ await runGithubCallWithRateLimitRecovery("users.getAuthenticated", () =>
   console.info(`Hello`, data.login);
 });
 
-const { Client } = elastic;
-const ElasticClient = new Client({
-  node: `${process.env.ELASTIC_ENDPOINT}:${process.env.ELASTIC_PORT}`,
-  auth: {
-    username: "elastic",
-    password: `${process.env.ELASTIC_PASSWORD}`,
-  },
-  ssl: {
-    ca: fs.readFileSync("/certs/ca/ca.crt"),
-    rejectUnauthorized: false,
-  },
-});
+const ElasticClient = createElasticClient();
 
 const stateFilePath = process.env.STATE_FILE || "./.jstats-state.json";
 const minPullUpdatedAt =
@@ -502,12 +490,14 @@ flushProgressLine(indexingProgress);
 ingestionState.last_run_completed_at = new Date().toISOString();
 saveState(stateFilePath, ingestionState);
 
-let port = process.env.PORT;
-let hostname = process.env.HOSTNAME;
+if (parseBooleanFlag(process.env.JSTATS_HTTP_SERVER, false)) {
+  const port = process.env.PORT;
+  const hostname = process.env.HOSTNAME;
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
-});
+  server.listen(port, hostname, () => {
+    console.log(`Server running at http://${hostname}:${port}/`);
+  });
+}
 
 function cleanComment(comment) {
   delete comment?.["_links"];
@@ -734,7 +724,11 @@ function addPlanned(progress, count, label) {
 }
 
 async function indexDocument(client, params, progress) {
-  await client.index(params);
+  await client.index({
+    index: params.index,
+    id: params.id,
+    document: params.body,
+  });
   progress.indexed += 1;
   reportProgress(progress);
 }
@@ -874,6 +868,21 @@ function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? "", 10);
   if (Number.isFinite(parsed) && parsed > 0) {
     return parsed;
+  }
+  return fallback;
+}
+
+function parseBooleanFlag(value, fallback = false) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "y"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "n"].includes(normalized)) {
+    return false;
   }
   return fallback;
 }

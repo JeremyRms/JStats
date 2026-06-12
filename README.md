@@ -5,6 +5,7 @@ JStats ingests GitHub organization data and stores it in Elasticsearch for Kiban
 ## What this repo currently contains
 - Ingestion service: `app.js`
 - Local Elastic/Kibana Docker setup: `elastic-docker-tls.yml`, `create-certs.yml`, `jstats.yml`
+- Elastic/Kibana 8 clean-rebuild helper: `.env.elastic8.example`, `scripts/elastic-stack-up.sh`
 - Bootstrap helper: `bootstrap.sh`
 - Shared team/member directory: `config/team-directory.json`
 - Versioned Kibana saved objects:
@@ -13,6 +14,8 @@ JStats ingests GitHub organization data and stores it in Elasticsearch for Kiban
   - `dashboards/team-directory.ndjson`
 
 ## Local startup
+The existing bootstrap path is the legacy local stack:
+
 Run:
 
 ```bash
@@ -20,6 +23,55 @@ Run:
 ```
 
 Then open [https://localhost:5601](https://localhost:5601).
+
+## Elastic/Kibana 8 clean rebuild
+Use this path for the 8.x migration. It creates a separate Docker Compose project, ports, and volumes so the old 7.14 data directory is not reused.
+
+```bash
+cp .env.elastic8.example .env.elastic8
+```
+
+Edit `.env.elastic8` and set at least:
+
+- `ORGANIZATION`
+- `ES_BOOTSTRAP_PASSWORD`
+- `ELASTIC_PASSWORD`
+- `KIBANA_PASSWORD`
+- Jira fields if Jira dashboards are being refreshed
+
+For this local 8.x stack, keep `ES_BOOTSTRAP_PASSWORD`, `ELASTIC_PASSWORD`, and `KIBANA_PASSWORD` set to the same value. Kibana connects to Elasticsearch with `kibana_system`, and `scripts/elastic-stack-up.sh` sets that user to the same local password.
+
+Start the new stack:
+
+```bash
+ENV_FILE=.env.elastic8 ./scripts/elastic-stack-up.sh
+```
+
+Then open [https://localhost:5608](https://localhost:5608).
+
+Run a full data refresh against the 8.x stack:
+
+```bash
+set -a
+source ~/.secrets
+set +a
+export API_KEY="${API_KEY:-$GITHUB_TOKEN}"
+ENV_FILE=.env.elastic8 ./scripts/run-manual-syncs.sh
+```
+
+Import dashboards manually if needed:
+
+```bash
+KIBANA_PASSWORD='<elastic-password>' \
+KIBANA_URL=https://localhost:5608 \
+./scripts/kibana-saved-objects.sh import dashboards/teamwork.ndjson
+```
+
+```bash
+KIBANA_PASSWORD='<elastic-password>' \
+KIBANA_URL=https://localhost:5608 \
+./scripts/kibana-saved-objects.sh import dashboards/jira-teamwork.ndjson
+```
 
 ## Dashboard as code workflow
 Kibana assets are tracked in source control as NDJSON and can be imported/exported with script automation.
@@ -51,52 +103,59 @@ KIBANA_PASSWORD='<elastic-password>' \
 - `KIBANA_USERNAME` (default `elastic`)
 - `KIBANA_SPACE` (default `default`)
 - `KIBANA_INSECURE_TLS` (default `true`)
+- `ES_CONTAINER_NAME` (default `es01`; use `es01-8` for the 8.x side-by-side stack)
+- `ELASTIC_HOST_PORT` (default `9200`; use `9208` for the 8.x side-by-side stack)
+- `KIBANA_HOST_PORT` (default `5601`; use `5608` for the 8.x side-by-side stack)
+- `KIBANA_ELASTICSEARCH_USERNAME` (default `elastic`; use `kibana_system` for the 8.x side-by-side stack)
 - `ORGANIZATION` (GitHub organization to ingest)
 - `JIRA_BASE_URL` (example `https://your-org.atlassian.net`)
 - `JIRA_EMAIL`
 - `JIRA_JQL`
 - `JIRA_PROJECT_KEYS` (comma-separated Jira project keys to track)
 - `TEAM_DIRECTORY_FILE` (default `config/team-directory.json`)
-- `GITHUB_API_KEY_FILE` (default `~/.jstats/github_api_key`)
+- `GITHUB_TOKEN` (GitHub token; copied to `API_KEY` when `API_KEY` is unset)
+- `API_KEY` (runtime GitHub token variable used by the ingestion app)
 - `JIRA_API_TOKEN_FILE` (default `~/.jira/api_token`)
-- `GITHUB_API_KEY_HOST_PATH` (host path mounted into `jstats.yml`, default local `.env` value `~/.jstats/github_api_key`)
 - `JIRA_API_TOKEN_HOST_PATH` (host path mounted into `jstats.yml`, default local `.env` value `~/.jira/api_token`)
 - `STATE_FILE` (default `./.jstats-state.json`)
 - `MIN_PULL_UPDATED_AT` (default `2025-01-01T00:00:00Z`)
 - `PR_CONCURRENCY` (default `4`)
 - `RATE_LIMIT_RESET_BUFFER_SECONDS` (default `5`)
 - `RATE_LIMIT_RECOVERY_RETRIES` (default `4`)
+- `JSTATS_HTTP_SERVER` (default `false`; set to `true` only when the GitHub ingester should keep a health server running after ingestion)
 
-## Secret files
-GitHub and Jira tokens can be loaded from files in your home directory before falling back to `.env`.
-
-Default locations:
+## Secrets
+GitHub tokens are loaded from the environment. On local machines, source `~/.secrets` before running sync commands:
 
 ```bash
-mkdir -p ~/.jstats
-mkdir -p ~/.jira
-printf '%s\n' '<github-token>' > ~/.jstats/github_api_key
-printf '%s\n' '<jira-api-token>' > ~/.jira/api_token
-chmod 600 ~/.jstats/github_api_key ~/.jira/api_token
+set -a
+source ~/.secrets
+set +a
+export API_KEY="${API_KEY:-$GITHUB_TOKEN}"
 ```
 
-If a secret file exists, it overrides the value from `.env`. If it does not exist, the `.env` value is used.
-
-When running via `jstats.yml`, Docker mounts the host secret files read-only and passes these container paths:
+Jira tokens can still be loaded from a file before falling back to the environment:
 
 ```bash
-GITHUB_API_KEY_FILE=/run/secrets/github_api_key
+mkdir -p ~/.jira
+printf '%s\n' '<jira-api-token>' > ~/.jira/api_token
+chmod 600 ~/.jira/api_token
+```
+
+When running via `jstats.yml`, Docker passes GitHub token environment variables and mounts the Jira token file read-only:
+
+```bash
+API_KEY="${API_KEY:-$GITHUB_TOKEN}"
 JIRA_API_TOKEN_FILE=/run/secrets/jira_api_token
 ```
 
-The host-side source paths are controlled by:
+The Jira host-side source path is controlled by:
 
 ```bash
-GITHUB_API_KEY_HOST_PATH=~/.jstats/github_api_key
 JIRA_API_TOKEN_HOST_PATH=~/.jira/api_token
 ```
 
-If either host path is unset, `jstats.yml` falls back to mounting `/dev/null`, so the app will then fall back to `.env` values instead of crashing on a missing bind source.
+If the Jira host path is unset, `jstats.yml` falls back to mounting `/dev/null`, so the app will then fall back to environment values instead of crashing on a missing bind source.
 
 ## Jira auth check
 Verify Jira credentials and print the authenticated Jira user:
@@ -178,11 +237,20 @@ This replaces the contents of these dedicated indices:
 
 - `jstats-directory-team`
 - `jstats-directory-member`
+- `jstats-contributor-summary` is derived separately from the team directory
+  and GitHub activity so ranked contributor charts can include active members
+  with zero activity.
 
 If your host cannot resolve the Docker-only Elasticsearch hostname from `.env`, override it:
 
 ```bash
 ELASTIC_ENDPOINT=https://localhost ELASTIC_PORT=9200 npm run team-directory:sync
+```
+
+To refresh the contributor activity summary after GitHub data changes:
+
+```bash
+npm run contributor-summary:sync
 ```
 
 ## GitHub archived repository cleanup
