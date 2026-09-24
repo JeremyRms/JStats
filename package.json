@@ -11,6 +11,8 @@
     "github:cleanup-archived-repos": "node scripts/github-clean-archived-repos.js",
     "jira:sync-issues": "node scripts/jira-sync-issues.js",
     "jira:sync-events": "node scripts/jira-sync-events.js",
+    "jira:sync-qa-cycles": "node scripts/jira-sync-qa-cycles.js",
+    "github:backfill-pr-metrics": "node scripts/backfill-pr-metrics.js",
     "contributor-summary:sync": "node scripts/contributor-summary-sync.js",
     "team-directory:sync": "node scripts/team-directory-sync.js"
   },

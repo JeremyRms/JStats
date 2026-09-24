@@ -307,6 +307,33 @@ Optional:
 - `JIRA_SYNC_YEAR` to restrict candidate issues to those updated in a given year and to index only events whose `event_timestamp` falls within that year
 - `JIRA_SYNC_RESUME` (default `true`) to resume from the last saved Jira sync checkpoint after a crash
 
+## Release process metrics
+PR documents carry computed release metrics (`pr_size`, `pr_changed_files`, `merge_lead_time_seconds`, `pr_time_to_merge_days`, `first_review_latency_seconds`, `first_review_latency_hours`, `first_review_submitted_at`). New ingestion runs add them automatically; to backfill documents indexed before this feature:
+
+```bash
+npm run github:backfill-pr-metrics
+```
+
+QA cycle documents (first transition into QA to first transition out, per issue) are indexed into `jstats-jira-qa-cycle`:
+
+```bash
+npm run jira:sync-qa-cycles
+```
+
+Optional:
+
+- `JIRA_QA_STATUSES` (comma-separated QA status names, case-insensitive; default `In QA,QA,Testing`)
+- `JIRA_QA_SYNC_MAX_ISSUES` (default `500`)
+- `JIRA_QA_SYNC_CONCURRENCY` (default `4`)
+- `JIRA_JQL` / `JIRA_SYNC_YEAR` scope the issue selection like the other Jira syncs
+
+Check-run ingestion for the contract-test gate is off by default; enable per run:
+
+- `INGEST_CHECK_RUNS=true` (adds one GitHub API call per PR)
+- `CONTRACT_TEST_CHECK_PATTERN` (case-insensitive regex matched against check names; fills `contract_test_check_present` / `contract_test_check_passed`)
+
+Dashboards: `dashboards/release-health.ndjson` and `dashboards/qa-load.ndjson`. Scope and remaining gaps are documented in [docs/release-process-metrics.md](docs/release-process-metrics.md).
+
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.
 

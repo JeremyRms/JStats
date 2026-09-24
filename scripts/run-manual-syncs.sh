@@ -31,6 +31,15 @@ read_env_value() {
 
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(read_env_value COMPOSE_PROJECT_NAME || printf 'jstats')}"
 ES_CONTAINER_NAME="${ES_CONTAINER_NAME:-$(read_env_value ES_CONTAINER_NAME || printf 'es01')}"
+# Sync scope. The per-script defaults (100 issues, 20 issues of events) only
+# fetch the most recently updated slice, so set them explicitly here.
+JIRA_SYNC_YEAR="${JIRA_SYNC_YEAR:-$(date -u +%Y)}"
+JIRA_SYNC_PAGE_SIZE="${JIRA_SYNC_PAGE_SIZE:-100}"
+JIRA_ISSUE_SYNC_MAX_RESULTS="${JIRA_ISSUE_SYNC_MAX_RESULTS:-20000}"
+JIRA_EVENT_SYNC_MAX_ISSUES="${JIRA_EVENT_SYNC_MAX_ISSUES:-3000}"
+JIRA_EVENT_SYNC_CONCURRENCY="${JIRA_EVENT_SYNC_CONCURRENCY:-4}"
+JIRA_QA_SYNC_MAX_ISSUES="${JIRA_QA_SYNC_MAX_ISSUES:-3000}"
+JIRA_QA_SYNC_CONCURRENCY="${JIRA_QA_SYNC_CONCURRENCY:-4}"
 HOST_ELASTIC_ENDPOINT="${HOST_ELASTIC_ENDPOINT:-https://localhost}"
 HOST_ELASTIC_PORT="${HOST_ELASTIC_PORT:-$(read_env_value ELASTIC_HOST_PORT || printf '9200')}"
 ELASTIC_ENDPOINT="${ELASTIC_ENDPOINT:-$HOST_ELASTIC_ENDPOINT}"
@@ -139,21 +148,45 @@ run_elastic_count 'Contributor summary count' jstats-contributor-summary
 
 run_step 'Jira issue sync' docker-compose "${COMPOSE_ENV_ARGS[@]}" -p "$COMPOSE_PROJECT_NAME" -f "$STACK_COMPOSE_FILE" -f "$COMPOSE_FILE" run --rm \
   -e JIRA_API_TOKEN="$JIRA_API_TOKEN" \
-  jstats bash -lc 'cd /app && JIRA_SYNC_YEAR=2026 JIRA_SYNC_PAGE_SIZE=100 JIRA_SYNC_RESUME=true npm run jira:sync-issues'
+  -e JIRA_SYNC_YEAR="$JIRA_SYNC_YEAR" \
+  -e JIRA_SYNC_PAGE_SIZE="$JIRA_SYNC_PAGE_SIZE" \
+  -e JIRA_ISSUE_SYNC_MAX_RESULTS="$JIRA_ISSUE_SYNC_MAX_RESULTS" \
+  -e JIRA_SYNC_RESUME=true \
+  jstats bash -lc 'cd /app && npm run jira:sync-issues'
 
 run_elastic_refresh 'Refresh Jira issue index' jstats-jira-issue
 run_elastic_count 'Jira issue count' jstats-jira-issue
 
 run_step 'Jira event sync' docker-compose "${COMPOSE_ENV_ARGS[@]}" -p "$COMPOSE_PROJECT_NAME" -f "$STACK_COMPOSE_FILE" -f "$COMPOSE_FILE" run --rm \
   -e JIRA_API_TOKEN="$JIRA_API_TOKEN" \
-  jstats bash -lc "cd /app && JIRA_SYNC_YEAR=2026 JIRA_SYNC_PAGE_SIZE=100 JIRA_EVENT_SYNC_CONCURRENCY=4 JIRA_SYNC_RESUME=true npm run jira:sync-events"
+  -e JIRA_SYNC_YEAR="$JIRA_SYNC_YEAR" \
+  -e JIRA_SYNC_PAGE_SIZE="$JIRA_SYNC_PAGE_SIZE" \
+  -e JIRA_EVENT_SYNC_MAX_ISSUES="$JIRA_EVENT_SYNC_MAX_ISSUES" \
+  -e JIRA_EVENT_SYNC_CONCURRENCY="$JIRA_EVENT_SYNC_CONCURRENCY" \
+  -e JIRA_SYNC_RESUME=true \
+  jstats bash -lc "cd /app && npm run jira:sync-events"
 
 run_elastic_refresh 'Refresh Jira event index' jstats-jira-event
 run_step 'Jira event aggregation' docker exec "$ES_CONTAINER_NAME" sh -lc "curl --silent --show-error --cacert /usr/share/elasticsearch/config/certificates/ca/ca.crt -u elastic:${ELASTIC_PASSWORD:-} -H 'Content-Type: application/json' -X POST https://localhost:9200/jstats-jira-event/_search -d '{\"size\":0,\"aggs\":{\"by_event_type\":{\"terms\":{\"field\":\"event_type.keyword\",\"size\":10}}}}'"
 
+run_step 'Jira QA cycle sync' docker-compose "${COMPOSE_ENV_ARGS[@]}" -p "$COMPOSE_PROJECT_NAME" -f "$STACK_COMPOSE_FILE" -f "$COMPOSE_FILE" run --rm \
+  -e JIRA_API_TOKEN="$JIRA_API_TOKEN" \
+  -e JIRA_SYNC_YEAR="$JIRA_SYNC_YEAR" \
+  -e JIRA_SYNC_PAGE_SIZE="$JIRA_SYNC_PAGE_SIZE" \
+  -e JIRA_QA_SYNC_MAX_ISSUES="$JIRA_QA_SYNC_MAX_ISSUES" \
+  -e JIRA_QA_SYNC_CONCURRENCY="$JIRA_QA_SYNC_CONCURRENCY" \
+  jstats bash -lc "cd /app && npm run jira:sync-qa-cycles"
+
+run_elastic_refresh 'Refresh Jira QA cycle index' jstats-jira-qa-cycle
+run_elastic_count 'Jira QA cycle count' jstats-jira-qa-cycle
+
+run_step 'Pull request metrics backfill' env ELASTIC_ENDPOINT="$ELASTIC_ENDPOINT" ELASTIC_PORT="$ELASTIC_PORT" npm run github:backfill-pr-metrics
+
 run_step 'Kibana import GitHub dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/teamwork.ndjson
 run_step 'Kibana import Jira dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/jira-teamwork.ndjson
 run_step 'Kibana import Team Directory dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/team-directory.ndjson
+run_step 'Kibana import Release health dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/release-health.ndjson
+run_step 'Kibana import QA load dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/qa-load.ndjson
 
 run_step 'Git status (post-run)' git status --short
 
