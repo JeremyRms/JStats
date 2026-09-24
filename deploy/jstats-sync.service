@@ -1,0 +1,21 @@
+[Unit]
+Description=JStats data sync
+Documentation=https://github.com/JeremyRms/JStats
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jstats
+WorkingDirectory=/opt/jstats
+Environment=ENV_FILE=/opt/jstats/.env.elastic8
+ExecStart=/opt/jstats/scripts/run-manual-syncs.sh
+# The GitHub ingester waits for the API quota to reset when it runs out.
+# One wait can last a full hour, so keep the timeout well above that.
+TimeoutStartSec=6h
+StandardOutput=append:/var/log/jstats/sync.log
+StandardError=append:/var/log/jstats/sync.log
+
+[Install]
+WantedBy=multi-user.target

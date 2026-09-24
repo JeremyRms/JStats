@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the JStats data sync every night
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# Run a missed sync after the machine comes back on.
+Persistent=true
+# Spread the start time so the sync does not always hit the APIs at once.
+RandomizedDelaySec=15m
+Unit=jstats-sync.service
+
+[Install]
+WantedBy=timers.target
