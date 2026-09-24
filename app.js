@@ -2,7 +2,11 @@ import http from "http";
 import pkg from "octokit";
 import pkgthrottling from "@octokit/plugin-throttling";
 import dotenv from "dotenv";
-import { enrichDocument } from "./src/document-enrichment.js";
+import {
+  enrichDocument,
+  enrichPullRequestCheckRuns,
+  enrichPullRequestMetrics,
+} from "./src/document-enrichment.js";
 import { createElasticClient } from "./src/elastic-client.js";
 import { loadSecretEnvValues } from "./src/secret-env.js";
 import {
@@ -104,6 +108,14 @@ let newestPullUpdatedAtInRun = null;
 let oldestPullUpdatedAtInRun = null;
 const indexingProgress = createProgressTracker();
 const prConcurrency = parsePositiveInteger(process.env.PR_CONCURRENCY, 4);
+const ingestCheckRuns = parseBooleanFlag(process.env.INGEST_CHECK_RUNS, false);
+const contractTestCheckPattern =
+  process.env.CONTRACT_TEST_CHECK_PATTERN || "";
+if (ingestCheckRuns) {
+  console.info(
+    `Check-run ingestion is enabled (contract test pattern: ${contractTestCheckPattern || "unset"})`
+  );
+}
 console.info(`PR concurrency is ${prConcurrency}`);
 
 const members = await runGithubCallWithRateLimitRecovery(
@@ -347,6 +359,30 @@ for (const repository of nonArchivedRepos) {
     ]);
 
     pullRequest["diff"] = prDiff?.["data"];
+
+    enrichPullRequestMetrics(pullRequest, reviews);
+
+    if (ingestCheckRuns && pullRequest.head?.sha) {
+      const checkRuns = await runGithubCallWithRateLimitRecovery(
+        `checks.listForRef ${repository.name}@${pullRequest.head.sha}`,
+        () =>
+          octokit.paginate(
+            octokit.rest.checks.listForRef,
+            {
+              owner: `${process.env.ORGANIZATION}`,
+              repo: repository.name,
+              ref: pullRequest.head.sha,
+              per_page: 100,
+            },
+            (response) => response.data
+          )
+      );
+      enrichPullRequestCheckRuns(
+        pullRequest,
+        checkRuns,
+        contractTestCheckPattern
+      );
+    }
 
     enrichDocument(pullRequest, {
       organization: `${process.env.ORGANIZATION}`,
