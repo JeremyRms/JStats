@@ -107,9 +107,18 @@ updates.
 5. Create a user named `jstats`.
 6. Turn on automatic login during the install, or turn it on later in Settings
    under Users.
+7. Install the OpenSSH server. Ubuntu Desktop leaves it out by default.
+
+```bash
+sudo apt update && sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+```
 
 Automatic login matters. Without it, the screen shows a login prompt after
 every reboot.
+
+The OpenSSH server matters as well. With it, the rest of this setup runs from
+another machine on the same network.
 
 ## Network
 
@@ -117,10 +126,16 @@ Connect the machine with an ethernet cable. Wireless works, because the data
 set is small and the sync is limited by API quotas rather than by bandwidth.
 Wired is steadier for a machine that nobody watches.
 
-Reserve the address on the router, so that the dashboard address never
-changes. If you keep wireless, also turn off power saving on the wireless
-adapter. Power saving is a common cause of a display box that drops off the
-network overnight.
+The machine answers at 10.10.30.41 on the wired network today. DHCP assigned
+that address. Reserve it on the router, so that the dashboard address never
+changes.
+
+If you keep wireless, also turn off power saving on the wireless adapter.
+Power saving is a common cause of a display box that drops off the network
+overnight.
+
+The screen on the box itself reads the dashboards at `https://localhost:5608`.
+Other people on the network read them at `https://10.10.30.41:5608`.
 
 ## Install Docker Engine
 
