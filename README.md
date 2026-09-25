@@ -334,6 +334,11 @@ Check-run ingestion for the contract-test gate is off by default; enable per run
 
 Dashboards: `dashboards/release-health.ndjson` and `dashboards/qa-load.ndjson`. Scope and remaining gaps are documented in [docs/release-process-metrics.md](docs/release-process-metrics.md).
 
+## Display box
+The configuration for the machine that runs this stack and shows the dashboards
+on a screen lives in the company `dashboards` repository, under `display-box/`.
+That includes the provisioning runbook and the nightly sync scheduling units.
+
 ## Organization-specific config
 Organization-specific values should live in `.env`, not in code or committed docs.
 
