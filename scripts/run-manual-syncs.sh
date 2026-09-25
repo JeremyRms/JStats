@@ -187,6 +187,7 @@ run_step 'Kibana import Jira dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" .
 run_step 'Kibana import Team Directory dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/team-directory.ndjson
 run_step 'Kibana import Release health dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/release-health.ndjson
 run_step 'Kibana import QA load dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/qa-load.ndjson
+run_step 'Kibana import Stale work dashboard' env KIBANA_PASSWORD="$KIBANA_PASSWORD" ./scripts/kibana-saved-objects.sh import dashboards/stale-work.ndjson
 
 run_step 'Git status (post-run)' git status --short
 
