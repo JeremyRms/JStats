@@ -11,7 +11,10 @@ services:
       - cluster.initial_master_nodes=es01
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"      
-      - xpack.license.self_generated.type=trial # <1>
+      # basic, not trial: a trial expires after 30 days and then Kibana
+      # refuses to start. Basic never expires and covers TLS, the native
+      # realm, role based access control, Lens and dashboards.
+      - xpack.license.self_generated.type=basic # <1>
       - xpack.security.enabled=true      
       - xpack.security.http.ssl.enabled=true # <2>
       - xpack.security.http.ssl.key=$CERTS_DIR/es01/es01.key
