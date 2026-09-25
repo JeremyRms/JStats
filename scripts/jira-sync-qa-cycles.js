@@ -12,6 +12,7 @@ import {
   appendJqlClauses,
   resolveJiraSyncWindow,
 } from "../src/jira-sync-window.js";
+import { withRetry } from "../src/retry.js";
 import { loadSecretEnvValues } from "../src/secret-env.js";
 
 dotenv.config();
@@ -61,12 +62,14 @@ try {
   let indexedCycles = 0;
 
   while (syncedIssues < maxIssues) {
-    const page = await jiraClient.searchIssues({
-      maxResults: Math.min(pageSize, maxIssues - syncedIssues),
-      fields,
-      jql: searchJql,
-      nextPageToken,
-    });
+    const page = await withRetry("Jira issue search", () =>
+      jiraClient.searchIssues({
+        maxResults: Math.min(pageSize, maxIssues - syncedIssues),
+        fields,
+        jql: searchJql,
+        nextPageToken,
+      })
+    );
 
     const issues = page.issues || [];
     if (issues.length === 0) {
@@ -112,10 +115,12 @@ async function getAllChangelogEntries(jiraClient, issueKey) {
   const maxResults = 100;
 
   for (;;) {
-    const page = await jiraClient.getIssueChangelog(issueKey, {
-      startAt,
-      maxResults,
-    });
+    const page = await withRetry(`Jira changelog for ${issueKey}`, () =>
+      jiraClient.getIssueChangelog(issueKey, {
+        startAt,
+        maxResults,
+      })
+    );
     const values = page.values || [];
     histories.push(...values);
 
