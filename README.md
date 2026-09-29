@@ -322,7 +322,13 @@ npm run jira:sync-qa-cycles
 
 Optional:
 
-- `JIRA_QA_STATUSES` (comma-separated QA status names, case-insensitive; default `In QA,QA,Testing`)
+- `JIRA_QA_STATUSES` (comma-separated QA status names, case-insensitive; code default
+  `In QA,QA,Testing`). Set this in `.env.elastic8`. The tracked value covers the QA
+  queue as well as active QA, so a cycle measures from the handover out of
+  development to the moment the issue leaves QA. Exit statuses such as `Passed QA`
+  and `Pending Release` must not appear in the list. Changing the list changes what
+  the metric means, so delete `jstats-jira-qa-cycle` and rebuild it after a change,
+  rather than leaving two definitions in one index.
 - `JIRA_QA_SYNC_MAX_ISSUES` (default `500`)
 - `JIRA_QA_SYNC_CONCURRENCY` (default `4`)
 - `JIRA_JQL` / `JIRA_SYNC_YEAR` scope the issue selection like the other Jira syncs
