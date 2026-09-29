@@ -42,6 +42,8 @@ JIRA_QA_SYNC_MAX_ISSUES="${JIRA_QA_SYNC_MAX_ISSUES:-3000}"
 JIRA_QA_SYNC_CONCURRENCY="${JIRA_QA_SYNC_CONCURRENCY:-4}"
 # Statuses that count as being in QA. Empty falls back to the script default.
 JIRA_QA_STATUSES="${JIRA_QA_STATUSES:-$(read_env_value JIRA_QA_STATUSES || printf '')}"
+JIRA_QA_FORWARD_STATUSES="${JIRA_QA_FORWARD_STATUSES:-$(read_env_value JIRA_QA_FORWARD_STATUSES || printf '')}"
+JIRA_QA_CANCELLED_STATUSES="${JIRA_QA_CANCELLED_STATUSES:-$(read_env_value JIRA_QA_CANCELLED_STATUSES || printf '')}"
 HOST_ELASTIC_ENDPOINT="${HOST_ELASTIC_ENDPOINT:-https://localhost}"
 HOST_ELASTIC_PORT="${HOST_ELASTIC_PORT:-$(read_env_value ELASTIC_HOST_PORT || printf '9200')}"
 ELASTIC_ENDPOINT="${ELASTIC_ENDPOINT:-$HOST_ELASTIC_ENDPOINT}"
@@ -178,6 +180,8 @@ run_step 'Jira QA cycle sync' docker-compose "${COMPOSE_ENV_ARGS[@]}" -p "$COMPO
   -e JIRA_QA_SYNC_MAX_ISSUES="$JIRA_QA_SYNC_MAX_ISSUES" \
   -e JIRA_QA_SYNC_CONCURRENCY="$JIRA_QA_SYNC_CONCURRENCY" \
   -e JIRA_QA_STATUSES="$JIRA_QA_STATUSES" \
+  -e JIRA_QA_FORWARD_STATUSES="$JIRA_QA_FORWARD_STATUSES" \
+  -e JIRA_QA_CANCELLED_STATUSES="$JIRA_QA_CANCELLED_STATUSES" \
   jstats bash -lc "cd /app && npm run jira:sync-qa-cycles"
 
 run_elastic_refresh 'Refresh Jira QA cycle index' jstats-jira-qa-cycle

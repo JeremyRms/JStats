@@ -7,6 +7,8 @@ import { resolveJiraAuthConfig } from "../src/jira-config.js";
 import {
   buildQaCycleDocument,
   resolveQaStatuses,
+  resolveForwardStatuses,
+  resolveCancelledStatuses,
 } from "../src/jira-qa-cycle-document.js";
 import {
   appendJqlClauses,
@@ -24,6 +26,8 @@ try {
   const elasticClient = createElasticClient();
   const syncWindow = resolveJiraSyncWindow();
   const qaStatuses = resolveQaStatuses();
+  const forwardStatuses = resolveForwardStatuses();
+  const cancelledStatuses = resolveCancelledStatuses();
   const maxIssues = parsePositiveInteger(
     process.env.JIRA_QA_SYNC_MAX_ISSUES,
     500
@@ -83,6 +87,8 @@ try {
         const histories = await getAllChangelogEntries(jiraClient, issue.key);
         return buildQaCycleDocument(issue, histories, qaStatuses, {
           baseUrl: jiraConfig.baseUrl,
+          forwardStatuses,
+          cancelledStatuses,
         });
       }
     );

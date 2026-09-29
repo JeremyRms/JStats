@@ -329,6 +329,11 @@ Optional:
   and `Pending Release` must not appear in the list. Changing the list changes what
   the metric means, so delete `jstats-jira-qa-cycle` and rebuild it after a change,
   rather than leaving two definitions in one index.
+- `JIRA_QA_FORWARD_STATUSES` (statuses that end a QA cycle as accepted or shipped;
+  default `Passed QA,Pending Release,Done,Released,Closed,Resolved`)
+- `JIRA_QA_CANCELLED_STATUSES` (statuses that end a QA cycle because the work was
+  dropped; default `Won't do,Will not do,Cancelled`). A QA exit to any status not
+  in the QA, forward, or cancelled lists counts as a bounce back to development.
 - `JIRA_QA_SYNC_MAX_ISSUES` (default `500`)
 - `JIRA_QA_SYNC_CONCURRENCY` (default `4`)
 - `JIRA_JQL` / `JIRA_SYNC_YEAR` scope the issue selection like the other Jira syncs
