@@ -52,3 +52,94 @@ Follow the existing dashboard-as-code pattern in `dashboards/*.ndjson`:
 - QA hours: confirm whether QA logs worklogs; if not, we report cycle time and label it as such.
 - Flag-debt tracking (improvement 5) needs API access to whichever flag system the team standardises on.
 - Thresholds (what counts as an oversized PR, target lead times) come from the release process "Parameters to calibrate" and should be set once, then referenced here.
+
+## How each metric is calculated
+
+This section states the exact rule behind each metric, so a reader can trust
+the number without reading the code.
+
+### Pull request metrics
+
+The ingester computes these fields on each pull request document. The code is
+in `src/document-enrichment.js`, function `enrichPullRequestMetrics`.
+
+- `pr_size` is `diff.additions` plus `diff.deletions`. It counts changed lines,
+  not files. `pr_changed_files` holds the file count on its own.
+- `merge_lead_time_seconds` is the time from `created_at` to `merged_at`.
+  `pr_time_to_merge_days` is the same value in days. Both are empty for a pull
+  request that never merged.
+- `first_review_latency_seconds` is the time from `created_at` to the first
+  review by a person other than the author. Reviews by the author do not count,
+  because a self review is not a peer review. `first_review_latency_hours` is
+  the same value in hours.
+
+The Release health dashboard reads these fields:
+
+- Median PR size per week takes the median `pr_size` of pull requests created
+  in each week.
+- PRs over the size threshold counts pull requests created in each week whose
+  `pr_size` is 1000 or more. The threshold of 1000 lines is provisional. Set
+  the real value once the release process parameters are agreed.
+- Median time to first review takes the median `first_review_latency_hours` by
+  pull request creation week.
+- Median merge lead time takes the median `pr_time_to_merge_days` by merge week.
+
+### QA cycle and rework metrics
+
+The QA cycle sync computes these fields per issue. The code is in
+`src/jira-qa-cycle-document.js`. It reads the issue changelog, orders the status
+transitions oldest first, and walks them once.
+
+Statuses fall into four groups, all matched without case sensitivity:
+
+- QA statuses, from `JIRA_QA_STATUSES`, cover the QA queue and active QA.
+- Forward statuses, from `JIRA_QA_FORWARD_STATUSES`, mean QA accepted the work
+  or the work shipped.
+- Cancelled statuses, from `JIRA_QA_CANCELLED_STATUSES`, mean the work was
+  dropped.
+- Any other status is a development status.
+
+The walk produces these fields:
+
+- `qa_started_at` is the first time the issue moved into a QA status.
+- `qa_ended_at` is the first time it moved from QA to a forward or cancelled
+  status. `qa_end_status` is that status.
+- `qa_cycle_seconds` and `qa_cycle_days` measure from `qa_started_at` to
+  `qa_ended_at`. This is calendar time from the first handover into QA to the
+  moment QA accepted the work, so a cycle that bounced spans all of its QA time.
+- `qa_entries` counts how many times the issue moved into QA.
+- `qa_bounces` counts how many times the issue moved from QA to a development
+  status. Each of these is one rework loop.
+- `qa_bounced` is true when `qa_bounces` is one or more.
+- `qa_open` is true when the issue entered QA and has no forward or cancelled
+  exit yet.
+
+The QA load dashboard reads these fields:
+
+- Issues bounced by QA counts documents where `qa_bounced` is true. This counts
+  issues, so an issue that bounced twice is counted once.
+- The total number of rework loops is the sum of `qa_bounces`. It is larger
+  than the issue count when issues bounce more than once.
+- The rework rate is the count of issues where `qa_bounced` is true, divided by
+  the number of issues that reached QA.
+- QA exit status mix groups the completed cycles by `qa_end_status`.
+
+Note on definitions. Counting issues answers "how many issues got sent back".
+Summing `qa_bounces` answers "how many times work got sent back". The second
+number is always the same or larger. Pick one and state which when you report
+it.
+
+### Stale work metrics
+
+The Stale work dashboard reads the pull request and Jira issue indexes
+directly. It defines stale as no update for 14 days or more.
+
+- Stale open pull requests are pull requests where `state` is open, `draft` is
+  not true, and `updated_at` is 14 days ago or older.
+- Stale in-progress issues are issues where the status category is
+  `indeterminate`, which is the Jira category for in-progress work, and
+  `updated_at` is 14 days ago or older.
+
+These counts read the index, not GitHub or Jira live. An index that is days out
+of date makes every document look stale, so the numbers are only correct
+straight after a sync.

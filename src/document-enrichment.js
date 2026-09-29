@@ -35,6 +35,16 @@ export function enrichDocument(document, context = {}) {
   return document;
 }
 
+// Release metrics on a pull request document. Each field:
+//   pr_size                       additions + deletions (changed lines)
+//   pr_changed_files              number of files touched
+//   merge_lead_time_seconds       created_at to merged_at, in seconds
+//   pr_time_to_merge_days         the same span, in days
+//   first_review_latency_seconds  created_at to the first review by someone
+//                                 other than the author, in seconds
+//   first_review_latency_hours    the same span, in hours
+// A field is left off when its inputs are missing, for example a pull request
+// that never merged has no merge lead time.
 export function enrichPullRequestMetrics(pullRequest, reviews = []) {
   if (!pullRequest || typeof pullRequest !== "object") {
     return pullRequest;
